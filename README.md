@@ -1,21 +1,23 @@
 # rtop
 
-Terminal-based system monitor for Linux with GPU support.
+Терминальный монитор системы для Linux с поддержкой GPU.
 
 ![Rust](https://img.shields.io/badge/Rust-1.75+-orange?logo=rust)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux-green)
 
-## Features
+## Возможности
 
-- **Process monitoring** — CPU, memory, uptime, status
-- **GPU support** — NVIDIA (nvidia-smi), AMD, Intel (sysfs/lspci)
-- **VRAM tracking** — Real-time GPU memory usage
-- **Interactive** — Sort, navigate, terminate processes
-- **Configurable** — CLI args and config file
-- **Lightweight** — Minimal dependencies, fast startup
+- **Процессы** — CPU, память, аптайм, статус
+- **GPU** — NVIDIA (nvidia-smi), AMD/Intel (sysfs/lspci)
+- **VRAM** — использование памяти видеокарты в реальном времени
+- **Дерево процессов** — раскрытие parent→child в Processes
+- **Сортировка и фильтры** — быстрые клавиши + клики мышью по заголовкам
+- **Системная вкладка** — расширенная информация + цветной ASCII‑логотип
+- **Контейнеры** — список контейнеров и drill‑down в процессы
+- **Setup/Help** — модальные окна (F2/F12)
 
-## Installation
+## Установка
 
 ```bash
 # Clone and build
@@ -27,49 +29,61 @@ cargo build --release
 cargo install --path .
 ```
 
-### Optional: PCI device names
+### Опционально: PCI названия устройств
 
-For human-readable GPU names instead of hex IDs:
+Для человекочитаемых имён GPU вместо hex ID:
 
 ```bash
 cargo build --release --features pci-names
 ```
 
-Requires `libpci-dev` / `pciutils-devel` package.
+Нужен пакет `libpci-dev` / `pciutils-devel`.
 
-## Usage
+## Использование
 
 ```bash
 rtop [options]
 ```
 
-### Options
+### Опции
 
-| Option | Description |
-|--------|-------------|
-| `--tick-ms <ms>` | Refresh interval (default: 1000, min: 100) |
-| `--no-vram` | Disable GPU probing |
-| `--sort <key>` | Sort by: `pid`, `cpu`, `mem`, `uptime`, `stat`, `name` |
-| `--sort-dir <dir>` | Sort direction: `asc`, `desc` |
-| `--gpu <pref>` | GPU preference: `auto`, `discrete`, `integrated` |
-| `-h, --help` | Show help |
+| Опция | Описание |
+|------|----------|
+| `--tick-ms <ms>` | Интервал обновления (по умолчанию 1000, минимум 100) |
+| `--no-vram` | Отключить GPU probing |
+| `--sort <key>` | Сортировка: `pid`, `user`, `cpu`, `mem`, `uptime`, `stat`, `name` |
+| `--sort-dir <dir>` | Направление: `asc`, `desc` |
+| `--gpu <pref>` | GPU предпочтение: `auto`, `discrete`, `integrated` |
+| `-h, --help` | Показать справку |
 
-### Keybindings
+### Горячие клавиши
 
-| Key | Action |
-|-----|--------|
-| `q` / `Ctrl+C` | Quit |
-| `↑` / `↓` | Navigate processes |
-| `←` / `→` | Change sort column |
-| `Space` | Toggle sort direction |
-| `Enter` | Terminate process (with confirmation) |
-| `c` / `m` / `p` / `n` | Quick sort by CPU/Mem/PID/Name |
-| `g` / `G` | Next/Previous GPU |
-| `r` | Force refresh |
+| Клавиша | Действие |
+|--------|----------|
+| `q` / `Ctrl+C` | Выход |
+| `↑` / `↓` | Навигация по процессам |
+| `←` / `→` | Смена колонки сортировки |
+| `Space` | Переключить направление сортировки |
+| `Enter` | Завершить процесс (с подтверждением) |
+| `c` / `m` / `p` / `n` / `u` | Быстрая сортировка CPU/Mem/PID/Name/User |
+| `h` | Подсветка процессов (user/non‑root/GUI) |
+| `g` / `G` | Следующий/предыдущий GPU |
+| `t` | Дерево процессов (только в Processes) |
+| `1` / `2` / `3` / `4` | Overview / System / GPU / Containers |
+| `Tab` | Циклическое переключение вкладок |
+| `b` / `Esc` | Назад из контейнерного drill‑down |
+| `F2` | Setup |
+| `F12` | Help |
+| `r` | Принудительное обновление |
 
-## Configuration
+### Мышь
 
-Config file: `~/.config/rtop/config.toml`
+- ЛКМ по заголовку колонки — сортировка по колонке / смена направления.
+- В режиме дерева сортировка фиксирована по PID.
+
+## Конфигурация
+
+Файл: `~/.config/rtop/config.toml`
 
 ```toml
 [general]
@@ -83,9 +97,9 @@ sort_dir = "desc"
 gpu_preference = "auto"
 ```
 
-CLI arguments override config file settings.
+CLI‑аргументы имеют приоритет над конфигом.
 
-## Architecture
+## Архитектура
 
 ```
 src/
@@ -100,17 +114,21 @@ src/
 └── utils/               # Helpers
 ```
 
-### GPU Detection
+## GPU детекция
 
-rtop uses multiple sources for GPU detection:
+rtop использует несколько источников:
 
-1. **nvidia-smi** — NVIDIA GPUs with VRAM info
-2. **lspci** — PCI device enumeration
-3. **sysfs** — `/sys/class/drm` for AMD VRAM
+1. **nvidia-smi** — NVIDIA GPUs с VRAM
+2. **lspci** — PCI перечисление
+3. **sysfs** — `/sys/class/drm` для AMD/Intel
 
-Results are merged with priority to nvidia-smi for NVIDIA cards.
+Результаты объединяются с приоритетом nvidia-smi для NVIDIA.
 
-## Dependencies
+## ASCII‑логотипы
+
+Документация для добавления логотипов: `docs/ASCII_LOGOS.md`.
+
+## Зависимости
 
 - [ratatui](https://github.com/ratatui-org/ratatui) — TUI framework
 - [crossterm](https://github.com/crossterm-rs/crossterm) — Terminal handling
@@ -118,6 +136,6 @@ Results are merged with priority to nvidia-smi for NVIDIA cards.
 - [serde](https://github.com/serde-rs/serde) + [toml](https://github.com/toml-rs/toml) — Config parsing
 - [thiserror](https://github.com/dtolnay/thiserror) — Error handling
 
-## License
+## Лицензия
 
 MIT
