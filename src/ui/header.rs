@@ -5,7 +5,7 @@ use sysinfo::System;
 
 use super::panel_block;
 use super::theme::{COLOR_ACCENT, COLOR_MUTED};
-use crate::app::App;
+use crate::app::{App, ViewMode};
 use crate::utils::{format_bytes, format_duration, percent};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
@@ -28,18 +28,50 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .add_modifier(Modifier::BOLD);
     let value_style = Style::default().fg(Color::White);
 
+    let mut first_line = vec![
+        Span::styled("rtop", title_style),
+        Span::raw("  "),
+        Span::styled("system monitor", Style::default().fg(COLOR_MUTED)),
+        Span::raw("  "),
+        Span::styled("sort ", label_style),
+        Span::styled(
+            format!("{} {}", app.sort_key.label(), app.sort_dir.label()),
+            Style::default().fg(COLOR_ACCENT),
+        ),
+        Span::raw("  "),
+        Span::styled("view ", label_style),
+        Span::styled(app.view_mode.label(), Style::default().fg(COLOR_ACCENT)),
+        Span::raw("  "),
+        Span::styled("highlight ", label_style),
+        Span::styled(
+            app.highlight_mode.label(),
+            Style::default().fg(COLOR_ACCENT),
+        ),
+    ];
+    if app.view_mode == ViewMode::Processes {
+        let tree_style = if app.tree_view {
+            Style::default().fg(COLOR_ACCENT)
+        } else {
+            Style::default().fg(COLOR_MUTED)
+        };
+        first_line.push(Span::raw("  "));
+        first_line.push(Span::styled("tree ", label_style));
+        first_line.push(Span::styled(
+            if app.tree_view { "on" } else { "off" },
+            tree_style,
+        ));
+    }
+    if let Some(filter) = app.container_filter.as_ref() {
+        first_line.push(Span::raw("  "));
+        first_line.push(Span::styled("container ", label_style));
+        first_line.push(Span::styled(
+            filter.label(),
+            Style::default().fg(COLOR_ACCENT),
+        ));
+    }
+
     let lines = vec![
-        Line::from(vec![
-            Span::styled("rtop", title_style),
-            Span::raw("  "),
-            Span::styled("system monitor", Style::default().fg(COLOR_MUTED)),
-            Span::raw("  "),
-            Span::styled("sort ", label_style),
-            Span::styled(
-                format!("{} {}", app.sort_key.label(), app.sort_dir.label()),
-                Style::default().fg(COLOR_ACCENT),
-            ),
-        ]),
+        Line::from(first_line),
         Line::from(vec![
             Span::styled("CPU", label_style),
             Span::styled(format!(" {:>5.1}%  ", cpu), value_style),

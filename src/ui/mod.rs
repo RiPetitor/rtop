@@ -1,18 +1,24 @@
 mod confirm;
+mod containers;
 mod footer;
+mod gpu;
 mod header;
+mod help;
 mod processes;
+mod setup;
 mod stats;
+mod system;
 pub mod theme;
 mod widgets;
 
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 
-use crate::app::App;
+use crate::app::{App, ViewMode};
 use theme::COLOR_BORDER;
 
 pub fn render(frame: &mut Frame, app: &mut App) {
+    app.process_header_regions.clear();
     let size = frame.size();
     if size.width < 60 || size.height < 22 {
         let msg = Paragraph::new("Terminal too small. Resize to at least 60x22.")
@@ -22,6 +28,29 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         return;
     }
 
+    match app.view_mode {
+        ViewMode::Overview => render_overview(frame, app, size),
+        ViewMode::Processes => render_processes_only(frame, app, size),
+        ViewMode::GpuFocus => render_gpu_focus(frame, app, size),
+        ViewMode::SystemInfo => render_system_info(frame, app, size),
+        ViewMode::Container => render_containers(frame, app, size),
+    }
+}
+
+pub fn panel_block(title: &str) -> Block<'_> {
+    Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain)
+        .border_style(Style::default().fg(COLOR_BORDER))
+        .title_style(
+            Style::default()
+                .fg(theme::COLOR_ACCENT)
+                .add_modifier(Modifier::BOLD),
+        )
+}
+
+fn render_overview(frame: &mut Frame, app: &mut App, size: Rect) {
     let header_height = 5;
     let footer_height = 4;
     let min_process_height = 8;
@@ -45,17 +74,86 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     processes::render(frame, chunks[2], app);
     footer::render(frame, chunks[3], app);
     confirm::render(frame, app);
+    help::render(frame, app);
+    setup::render(frame, app);
 }
 
-pub fn panel_block(title: &str) -> Block<'_> {
-    Block::default()
-        .title(title)
-        .borders(Borders::ALL)
-        .border_type(BorderType::Plain)
-        .border_style(Style::default().fg(COLOR_BORDER))
-        .title_style(
-            Style::default()
-                .fg(theme::COLOR_ACCENT)
-                .add_modifier(Modifier::BOLD),
-        )
+fn render_processes_only(frame: &mut Frame, app: &mut App, size: Rect) {
+    let header_height = 5;
+    let footer_height = 4;
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Min(8),
+            Constraint::Length(footer_height),
+        ])
+        .split(size);
+
+    header::render(frame, chunks[0], app);
+    processes::render(frame, chunks[1], app);
+    footer::render(frame, chunks[2], app);
+    confirm::render(frame, app);
+    help::render(frame, app);
+    setup::render(frame, app);
+}
+
+fn render_gpu_focus(frame: &mut Frame, app: &mut App, size: Rect) {
+    let header_height = 5;
+    let footer_height = 4;
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Min(8),
+            Constraint::Length(footer_height),
+        ])
+        .split(size);
+
+    header::render(frame, chunks[0], app);
+    gpu::render(frame, chunks[1], app);
+    footer::render(frame, chunks[2], app);
+    confirm::render(frame, app);
+    help::render(frame, app);
+    setup::render(frame, app);
+}
+
+fn render_system_info(frame: &mut Frame, app: &mut App, size: Rect) {
+    let header_height = 5;
+    let footer_height = 4;
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Min(8),
+            Constraint::Length(footer_height),
+        ])
+        .split(size);
+
+    header::render(frame, chunks[0], app);
+    system::render(frame, chunks[1], app);
+    footer::render(frame, chunks[2], app);
+    confirm::render(frame, app);
+    help::render(frame, app);
+    setup::render(frame, app);
+}
+
+fn render_containers(frame: &mut Frame, app: &mut App, size: Rect) {
+    let header_height = 5;
+    let footer_height = 4;
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Min(8),
+            Constraint::Length(footer_height),
+        ])
+        .split(size);
+
+    header::render(frame, chunks[0], app);
+    containers::render(frame, chunks[1], app);
+    footer::render(frame, chunks[2], app);
+    confirm::render(frame, app);
+    help::render(frame, app);
+    setup::render(frame, app);
 }

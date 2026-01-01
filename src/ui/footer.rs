@@ -3,7 +3,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
 use super::theme::{COLOR_ACCENT, COLOR_BORDER, COLOR_MUTED};
-use crate::app::App;
+use crate::app::{App, ViewMode};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let key_style = Style::default()
@@ -17,27 +17,42 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             status.level.style(),
         ))]
     } else {
+        let enter_label = if app.view_mode == ViewMode::Container {
+            "drill"
+        } else {
+            "terminate"
+        };
+        let mut second_line = vec![
+            Span::styled("up/down", key_style),
+            Span::styled(" move  ", hint_style),
+            Span::styled("left/right", key_style),
+            Span::styled(" column  ", hint_style),
+            Span::styled("space", key_style),
+            Span::styled(" order  ", hint_style),
+            Span::styled("enter", key_style),
+            Span::styled(format!(" {enter_label}  "), hint_style),
+            Span::styled("t", key_style),
+            Span::styled(" tree  ", hint_style),
+            Span::styled("tab", key_style),
+            Span::styled(" view", hint_style),
+        ];
+        if app.container_filter.is_some() {
+            second_line.push(Span::styled("  ", hint_style));
+            second_line.push(Span::styled("b/esc", key_style));
+            second_line.push(Span::styled(" back", hint_style));
+        }
         vec![
             Line::from(vec![
                 Span::styled("q", key_style),
                 Span::styled(" quit  ", hint_style),
                 Span::styled("r", key_style),
                 Span::styled(" refresh  ", hint_style),
-                Span::styled("up/down", key_style),
-                Span::styled(" move  ", hint_style),
-                Span::styled("left/right", key_style),
-                Span::styled(" column  ", hint_style),
-                Span::styled("space", key_style),
-                Span::styled(" order", hint_style),
+                Span::styled("F2", key_style),
+                Span::styled(" setup  ", hint_style),
+                Span::styled("F12", key_style),
+                Span::styled(" help", hint_style),
             ]),
-            Line::from(vec![
-                Span::styled("enter", key_style),
-                Span::styled(" terminate  ", hint_style),
-                Span::styled("c/m/p/n", key_style),
-                Span::styled(" quick sort  ", hint_style),
-                Span::styled("g/G", key_style),
-                Span::styled(" gpu", hint_style),
-            ]),
+            Line::from(second_line),
         ]
     };
 

@@ -1,12 +1,22 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
+use std::time::Instant;
 
+use ratatui::prelude::Rect;
 use ratatui::widgets::TableState;
-use sysinfo::{Pid, Signal, System};
+use sysinfo::{Pid, Signal, System, Uid, Users};
 
 use super::config::Config;
+use super::highlight::HighlightMode;
 use super::status::{StatusLevel, StatusMessage};
-use crate::data::gpu::{GpuInfo, GpuPreference, GpuSnapshot, default_gpu_index, start_gpu_monitor};
-use crate::data::{ProcessRow, SortDir, SortKey, sort_process_rows};
+use super::view_mode::ViewMode;
+use crate::data::gpu::{
+    GpuInfo, GpuPreference, GpuProcessUsage, GpuSnapshot, default_gpu_index, start_gpu_monitor,
+};
+use crate::data::{
+    ContainerKey, ContainerRow, NetSample, ProcessRow, SortDir, SortKey, container_key_for_pid,
+    net_sample_for_pid, netns_id_for_pid, sort_process_rows,
+};
 
 pub struct ConfirmKill {
     pub pid: u32,
@@ -17,47 +27,153 @@ pub struct ConfirmKill {
     pub start_time: u64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Language {
+    English,
+    Russian,
+}
+
+impl Language {
+    pub fn label(self) -> &'static str {
+        match self {
+            Language::English => "English",
+            Language::Russian => "Russian",
+        }
+    }
+
+    pub fn toggle(self) -> Self {
+        match self {
+            Language::English => Language::Russian,
+            Language::Russian => Language::English,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct HeaderRegion {
+    pub key: SortKey,
+    pub rect: Rect,
+}
+
+#[derive(Default, Clone, Copy)]
+struct ProcessGpuUsage {
+    sm_pct: Option<f32>,
+    mem_pct: Option<f32>,
+    enc_pct: Option<f32>,
+    dec_pct: Option<f32>,
+    fb_bytes: u64,
+    kind: Option<char>,
+}
+
+struct NetSampleEntry {
+    sample: NetSample,
+    timestamp: Instant,
+}
+
+impl ProcessGpuUsage {
+    fn apply_entry(&mut self, entry: &GpuProcessUsage) {
+        merge_optional_max(&mut self.sm_pct, entry.sm_pct);
+        merge_optional_max(&mut self.mem_pct, entry.mem_pct);
+        merge_optional_max(&mut self.enc_pct, entry.enc_pct);
+        merge_optional_max(&mut self.dec_pct, entry.dec_pct);
+        if let Some(fb_mb) = entry.fb_mb {
+            self.fb_bytes = self
+                .fb_bytes
+                .saturating_add(fb_mb.saturating_mul(1024 * 1024));
+        }
+        if let Some(kind) = entry.kind {
+            match self.kind {
+                Some('C') => {}
+                Some('G') if kind == 'C' => self.kind = Some('C'),
+                None => self.kind = Some(kind),
+                _ => {}
+            }
+        }
+    }
+}
+
 pub struct App {
     pub system: System,
+    users: Users,
+    current_user_id: Option<Uid>,
     pub sort_key: SortKey,
     pub sort_dir: SortDir,
+    pub tree_view: bool,
     pub rows: Vec<ProcessRow>,
     pub table_state: TableState,
     pub selected_pid: Option<u32>,
     pub scroll: usize,
+    pub tree_labels: HashMap<u32, String>,
+    pub process_header_regions: Vec<HeaderRegion>,
+    pub container_rows: Vec<ContainerRow>,
+    pub container_table_state: TableState,
+    pub container_selected: Option<ContainerKey>,
+    pub container_scroll: usize,
+    pub container_pid_map: HashMap<u32, ContainerKey>,
+    pub container_filter: Option<ContainerKey>,
+    container_net_prev: HashMap<u64, NetSampleEntry>,
     pub confirm: Option<ConfirmKill>,
+    pub highlight_mode: HighlightMode,
     pub vram_enabled: bool,
     pub gpu_pref: GpuPreference,
     pub gpu_list: Vec<GpuInfo>,
     pub gpu_selected: Option<String>,
+    pub gpu_processes: Vec<GpuProcessUsage>,
     gpu_rx: Option<mpsc::Receiver<GpuSnapshot>>,
     pub status: Option<StatusMessage>,
+    pub view_mode: ViewMode,
+    pub show_setup: bool,
+    pub show_help: bool,
+    pub language: Language,
 }
 
 impl App {
     pub fn new(config: Config) -> Self {
         let mut system = System::new_all();
         system.refresh_all();
+        let users = Users::new_with_refreshed_list();
+        let current_user_id = system
+            .process(Pid::from_u32(std::process::id()))
+            .and_then(|process| process.user_id())
+            .cloned();
         let gpu_rx = if config.vram_enabled {
-            Some(start_gpu_monitor())
+            Some(start_gpu_monitor(config.gpu_poll_rate))
         } else {
             None
         };
         let mut app = Self {
             system,
+            users,
+            current_user_id,
             sort_key: config.sort_key,
             sort_dir: config.sort_dir,
+            tree_view: false,
             rows: Vec::new(),
             table_state: TableState::default(),
             selected_pid: None,
             scroll: 0,
+            tree_labels: HashMap::new(),
+            process_header_regions: Vec::new(),
+            container_rows: Vec::new(),
+            container_table_state: TableState::default(),
+            container_selected: None,
+            container_scroll: 0,
+            container_pid_map: HashMap::new(),
+            container_filter: None,
+            container_net_prev: HashMap::new(),
             confirm: None,
+            highlight_mode: HighlightMode::default(),
             vram_enabled: config.vram_enabled,
             gpu_pref: config.gpu_pref,
             gpu_list: Vec::new(),
             gpu_selected: None,
+            gpu_processes: Vec::new(),
             gpu_rx,
             status: None,
+            view_mode: ViewMode::default(),
+            show_setup: false,
+            show_help: false,
+            language: Language::English,
         };
         app.update_rows();
         app.poll_gpu_updates();
@@ -66,7 +182,18 @@ impl App {
 
     pub fn refresh(&mut self) {
         self.system.refresh_all();
+        self.users.refresh_list();
         self.update_rows();
+        let needs_containers =
+            matches!(self.view_mode, ViewMode::Container) || self.container_filter.is_some();
+        if needs_containers {
+            self.update_containers();
+            if let Some(filter) = self.container_filter.as_ref() {
+                self.rows
+                    .retain(|row| self.container_pid_map.get(&row.pid) == Some(filter));
+                self.sync_selection();
+            }
+        }
     }
 
     pub fn tick(&mut self) {
@@ -75,34 +202,99 @@ impl App {
     }
 
     pub fn set_sort_key(&mut self, key: SortKey) {
+        if self.tree_view && key != SortKey::Pid {
+            return;
+        }
         self.sort_key = key;
         self.sort_dir = key.default_dir();
         self.update_rows();
     }
 
     pub fn toggle_sort_dir(&mut self) {
+        if self.tree_view {
+            return;
+        }
         self.sort_dir = self.sort_dir.toggle();
         self.update_rows();
     }
 
-    pub fn update_rows(&mut self) {
-        let mut rows = self
-            .system
-            .processes()
-            .iter()
-            .map(|(pid, process)| ProcessRow {
-                pid: pid.as_u32(),
-                name: process.name().to_string(),
-                cpu: process.cpu_usage(),
-                mem_bytes: process.memory(),
-                status: format!("{:?}", process.status()),
-                start_time: process.start_time(),
-                uptime_secs: process.run_time(),
-            })
-            .collect::<Vec<_>>();
+    pub fn cycle_highlight_mode(&mut self) {
+        self.highlight_mode = self.highlight_mode.cycle();
+    }
 
-        sort_process_rows(&mut rows, self.sort_key, self.sort_dir);
-        self.rows = rows;
+    pub fn current_user_name(&self) -> Option<&str> {
+        let user_id = self.current_user_id.as_ref()?;
+        self.users.get_user_by_id(user_id).map(|user| user.name())
+    }
+
+    pub fn update_rows(&mut self) {
+        let gpu_usage = build_gpu_usage_map(&self.gpu_processes);
+        let current_user_id = self.current_user_id.as_ref();
+        let mut rows_map = HashMap::with_capacity(self.system.processes().len());
+        let mut parents = HashMap::with_capacity(self.system.processes().len());
+
+        for (pid, process) in self.system.processes() {
+            let pid = pid.as_u32();
+            let user_id = process.user_id();
+            let user = user_id
+                .and_then(|id| self.users.get_user_by_id(id))
+                .map(|user| user.name().to_string());
+            let is_current_user = match (current_user_id, user_id) {
+                (Some(current), Some(id)) => current == id,
+                _ => false,
+            };
+            let is_non_root = is_non_root_user(user_id);
+            let is_gui = is_gui_process(process.environ());
+
+            parents.insert(pid, process.parent().map(|parent| parent.as_u32()));
+
+            rows_map.insert(
+                pid,
+                ProcessRow {
+                    pid,
+                    user,
+                    name: process.name().to_string(),
+                    cpu: process.cpu_usage(),
+                    mem_bytes: process.memory(),
+                    status: format!("{:?}", process.status()),
+                    start_time: process.start_time(),
+                    uptime_secs: process.run_time(),
+                    is_current_user,
+                    is_non_root,
+                    is_gui,
+                    gpu_sm_pct: gpu_usage.get(&pid).and_then(|usage| usage.sm_pct),
+                    gpu_mem_pct: gpu_usage.get(&pid).and_then(|usage| usage.mem_pct),
+                    gpu_enc_pct: gpu_usage.get(&pid).and_then(|usage| usage.enc_pct),
+                    gpu_dec_pct: gpu_usage.get(&pid).and_then(|usage| usage.dec_pct),
+                    gpu_fb_bytes: gpu_usage
+                        .get(&pid)
+                        .and_then(|usage| (usage.fb_bytes > 0).then_some(usage.fb_bytes)),
+                    gpu_kind: gpu_usage.get(&pid).and_then(|usage| usage.kind),
+                },
+            );
+        }
+
+        if self.tree_view {
+            let layout = build_tree_layout(&parents, &rows_map);
+            let mut rows = Vec::with_capacity(rows_map.len());
+            for pid in layout.order {
+                if let Some(row) = rows_map.remove(&pid) {
+                    rows.push(row);
+                }
+            }
+            if !rows_map.is_empty() {
+                let mut extras = rows_map.into_values().collect::<Vec<_>>();
+                extras.sort_by_key(|row| row.pid);
+                rows.extend(extras);
+            }
+            self.rows = rows;
+            self.tree_labels = layout.labels;
+        } else {
+            let mut rows = rows_map.into_values().collect::<Vec<_>>();
+            sort_process_rows(&mut rows, self.sort_key, self.sort_dir);
+            self.rows = rows;
+            self.tree_labels.clear();
+        }
         self.sync_selection();
     }
 
@@ -123,6 +315,26 @@ impl App {
 
         self.table_state.select(Some(selected_idx));
         self.selected_pid = Some(self.rows[selected_idx].pid);
+    }
+
+    fn sync_container_selection(&mut self) {
+        if self.container_rows.is_empty() {
+            self.container_table_state.select(None);
+            self.container_selected = None;
+            self.container_scroll = 0;
+            return;
+        }
+
+        let selected_idx = self
+            .container_selected
+            .as_ref()
+            .and_then(|key| self.container_rows.iter().position(|row| &row.key == key))
+            .or_else(|| self.container_table_state.selected())
+            .filter(|&idx| idx < self.container_rows.len())
+            .unwrap_or(0);
+
+        self.container_table_state.select(Some(selected_idx));
+        self.container_selected = Some(self.container_rows[selected_idx].key.clone());
     }
 
     pub fn move_selection(&mut self, delta: i32) {
@@ -165,6 +377,156 @@ impl App {
         if self.scroll > max_scroll {
             self.scroll = max_scroll;
         }
+    }
+
+    pub fn update_containers(&mut self) {
+        #[derive(Default)]
+        struct ContainerUsage {
+            cpu: f32,
+            mem_bytes: u64,
+            proc_count: usize,
+            netns_id: Option<u64>,
+        }
+
+        let mut map: HashMap<ContainerKey, ContainerUsage> = HashMap::new();
+        let mut pid_map = HashMap::new();
+        let mut netns_pids: HashMap<u64, u32> = HashMap::new();
+        let mut netns_container_counts: HashMap<u64, usize> = HashMap::new();
+        for (pid, process) in self.system.processes() {
+            let pid = pid.as_u32();
+            if let Some(key) = container_key_for_pid(pid) {
+                pid_map.insert(pid, key.clone());
+                let entry = map.entry(key.clone()).or_default();
+                entry.cpu += process.cpu_usage();
+                entry.mem_bytes = entry.mem_bytes.saturating_add(process.memory());
+                entry.proc_count += 1;
+                if entry.netns_id.is_none() {
+                    if let Some(netns_id) = netns_id_for_pid(pid) {
+                        entry.netns_id = Some(netns_id);
+                        netns_pids.entry(netns_id).or_insert(pid);
+                        *netns_container_counts.entry(netns_id).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+
+        let now = Instant::now();
+        let mut net_rates: HashMap<u64, u64> = HashMap::new();
+        let mut next_net_prev: HashMap<u64, NetSampleEntry> = HashMap::new();
+        for (netns_id, pid) in netns_pids {
+            if let Some(sample) = net_sample_for_pid(pid) {
+                if let Some(prev) = self.container_net_prev.get(&netns_id) {
+                    let elapsed = now.duration_since(prev.timestamp).as_secs_f64();
+                    if elapsed > 0.0 {
+                        let rx_delta = sample.rx_bytes.saturating_sub(prev.sample.rx_bytes);
+                        let tx_delta = sample.tx_bytes.saturating_sub(prev.sample.tx_bytes);
+                        let rx_rate = (rx_delta as f64 / elapsed).round() as u64;
+                        let tx_rate = (tx_delta as f64 / elapsed).round() as u64;
+                        net_rates.insert(netns_id, rx_rate.saturating_add(tx_rate));
+                    }
+                }
+                next_net_prev.insert(
+                    netns_id,
+                    NetSampleEntry {
+                        sample,
+                        timestamp: now,
+                    },
+                );
+            }
+        }
+        self.container_net_prev = next_net_prev;
+
+        let mut rows = map
+            .into_iter()
+            .map(|(key, usage)| {
+                let net_bytes_per_sec = usage.netns_id.and_then(|netns_id| {
+                    let count = netns_container_counts.get(&netns_id).copied().unwrap_or(0);
+                    if count > 1 {
+                        None
+                    } else {
+                        net_rates.get(&netns_id).copied()
+                    }
+                });
+                ContainerRow::new(
+                    key,
+                    usage.cpu,
+                    usage.mem_bytes,
+                    usage.proc_count,
+                    net_bytes_per_sec,
+                )
+            })
+            .collect::<Vec<_>>();
+        rows.sort_by(|a, b| {
+            b.cpu
+                .partial_cmp(&a.cpu)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.mem_bytes.cmp(&a.mem_bytes))
+                .then_with(|| a.label.cmp(&b.label))
+        });
+
+        self.container_rows = rows;
+        self.container_pid_map = pid_map;
+        self.sync_container_selection();
+    }
+
+    pub fn move_container_selection(&mut self, delta: i32) {
+        if self.container_rows.is_empty() {
+            self.container_table_state.select(None);
+            self.container_selected = None;
+            return;
+        }
+
+        let current = self.container_table_state.selected().unwrap_or(0);
+        let len = self.container_rows.len();
+        let new_index = if delta < 0 {
+            current.saturating_sub(delta.unsigned_abs() as usize)
+        } else {
+            (current + delta as usize).min(len.saturating_sub(1))
+        };
+
+        self.container_table_state.select(Some(new_index));
+        self.container_selected = Some(self.container_rows[new_index].key.clone());
+    }
+
+    pub fn selected_container(&self) -> Option<&ContainerRow> {
+        self.container_table_state
+            .selected()
+            .and_then(|idx| self.container_rows.get(idx))
+    }
+
+    pub fn ensure_container_visible(&mut self, max_rows: usize) {
+        if max_rows == 0 {
+            return;
+        }
+        if let Some(selected) = self.container_table_state.selected() {
+            if selected < self.container_scroll {
+                self.container_scroll = selected;
+            } else if selected >= self.container_scroll + max_rows {
+                self.container_scroll = selected + 1 - max_rows;
+            }
+        }
+        let max_scroll = self.container_rows.len().saturating_sub(max_rows);
+        if self.container_scroll > max_scroll {
+            self.container_scroll = max_scroll;
+        }
+    }
+
+    pub fn enter_container(&mut self) {
+        let Some(row) = self.selected_container() else {
+            return;
+        };
+        self.container_filter = Some(row.key.clone());
+        self.set_view_mode(ViewMode::Processes);
+        self.refresh();
+    }
+
+    pub fn exit_container_drill(&mut self) {
+        if self.container_filter.is_none() {
+            return;
+        }
+        self.container_filter = None;
+        self.set_view_mode(ViewMode::Container);
+        self.refresh();
     }
 
     pub fn open_confirm(&mut self) {
@@ -230,6 +592,7 @@ impl App {
         }
         if let Some(snapshot) = latest {
             self.update_gpu_list(snapshot.gpus);
+            self.gpu_processes = snapshot.processes;
         }
     }
 
@@ -292,6 +655,71 @@ impl App {
         self.status = Some(StatusMessage::new(level, message));
     }
 
+    pub fn set_view_mode(&mut self, mode: ViewMode) {
+        if mode != ViewMode::Processes {
+            self.container_filter = None;
+            self.tree_view = false;
+        }
+        self.view_mode = mode;
+    }
+
+    pub fn cycle_view_mode(&mut self) {
+        let next = match self.view_mode {
+            ViewMode::Overview => ViewMode::Processes,
+            ViewMode::Processes => ViewMode::GpuFocus,
+            ViewMode::GpuFocus => ViewMode::SystemInfo,
+            ViewMode::SystemInfo => ViewMode::Container,
+            ViewMode::Container => ViewMode::Overview,
+        };
+        if next != ViewMode::Processes {
+            self.container_filter = None;
+            self.tree_view = false;
+        }
+        self.view_mode = next;
+    }
+
+    pub fn toggle_tree_view(&mut self) {
+        if self.view_mode != ViewMode::Processes {
+            return;
+        }
+        self.tree_view = !self.tree_view;
+        if self.tree_view {
+            self.sort_key = SortKey::Pid;
+            self.sort_dir = SortDir::Asc;
+        }
+        self.update_rows();
+    }
+
+    pub fn toggle_setup(&mut self) {
+        self.show_setup = !self.show_setup;
+        if self.show_setup {
+            self.show_help = false;
+        }
+    }
+
+    pub fn toggle_help(&mut self) {
+        self.show_help = !self.show_help;
+        if self.show_help {
+            self.show_setup = false;
+        }
+    }
+
+    pub fn toggle_language(&mut self) {
+        self.language = self.language.toggle();
+    }
+
+    pub fn sort_key_for_header_click(&self, column: u16, row: u16) -> Option<SortKey> {
+        self.process_header_regions
+            .iter()
+            .find(|region| {
+                row >= region.rect.y
+                    && row < region.rect.y.saturating_add(region.rect.height)
+                    && column >= region.rect.x
+                    && column < region.rect.x.saturating_add(region.rect.width)
+            })
+            .map(|region| region.key)
+    }
+
     fn clear_expired_status(&mut self) {
         if let Some(status) = self.status.as_ref() {
             if status.is_expired() {
@@ -303,5 +731,161 @@ impl App {
     /// Apply GPU snapshot from event system
     pub fn apply_gpu_snapshot(&mut self, snapshot: crate::data::gpu::GpuSnapshot) {
         self.update_gpu_list(snapshot.gpus);
+        self.gpu_processes = snapshot.processes;
+    }
+}
+
+fn build_gpu_usage_map(gpu_processes: &[GpuProcessUsage]) -> HashMap<u32, ProcessGpuUsage> {
+    let mut map = HashMap::with_capacity(gpu_processes.len());
+    for entry in gpu_processes {
+        map.entry(entry.pid)
+            .or_insert_with(ProcessGpuUsage::default)
+            .apply_entry(entry);
+    }
+    map
+}
+
+struct TreeLayout {
+    order: Vec<u32>,
+    labels: HashMap<u32, String>,
+}
+
+fn build_tree_layout(
+    parents: &HashMap<u32, Option<u32>>,
+    rows: &HashMap<u32, ProcessRow>,
+) -> TreeLayout {
+    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+    for (&pid, parent) in parents.iter() {
+        if let Some(parent) = *parent {
+            children.entry(parent).or_default().push(pid);
+        }
+    }
+    for list in children.values_mut() {
+        list.sort_unstable();
+    }
+
+    let mut roots = Vec::new();
+    for (&pid, parent) in parents.iter() {
+        let has_parent = parent
+            .and_then(|parent| parents.contains_key(&parent).then_some(parent))
+            .is_some();
+        if !has_parent {
+            roots.push(pid);
+        }
+    }
+    roots.sort_unstable();
+
+    let mut layout = TreeLayout {
+        order: Vec::with_capacity(rows.len()),
+        labels: HashMap::with_capacity(rows.len()),
+    };
+    let mut visited = HashSet::with_capacity(rows.len());
+
+    for (idx, root) in roots.iter().enumerate() {
+        let is_last = idx + 1 == roots.len();
+        push_tree_layout(
+            *root,
+            "",
+            is_last,
+            true,
+            &children,
+            rows,
+            &mut layout,
+            &mut visited,
+        );
+    }
+
+    layout
+}
+
+fn push_tree_layout(
+    pid: u32,
+    prefix: &str,
+    is_last: bool,
+    is_root: bool,
+    children: &HashMap<u32, Vec<u32>>,
+    rows: &HashMap<u32, ProcessRow>,
+    layout: &mut TreeLayout,
+    visited: &mut HashSet<u32>,
+) {
+    if !visited.insert(pid) {
+        return;
+    }
+    let Some(row) = rows.get(&pid) else {
+        return;
+    };
+
+    let connector = if is_root {
+        ""
+    } else if is_last {
+        "\\- "
+    } else {
+        "|- "
+    };
+    let label = format!("{prefix}{connector}{}", row.name);
+    layout.labels.insert(pid, label);
+    layout.order.push(pid);
+
+    let next_prefix = if is_root {
+        String::new()
+    } else if is_last {
+        format!("{prefix}   ")
+    } else {
+        format!("{prefix}|  ")
+    };
+
+    if let Some(list) = children.get(&pid) {
+        let last_index = list.len().saturating_sub(1);
+        for (idx, child) in list.iter().enumerate() {
+            push_tree_layout(
+                *child,
+                &next_prefix,
+                idx == last_index,
+                false,
+                children,
+                rows,
+                layout,
+                visited,
+            );
+        }
+    }
+}
+
+fn merge_optional_max(current: &mut Option<f32>, incoming: Option<f32>) {
+    let Some(value) = incoming else {
+        return;
+    };
+    match current {
+        Some(existing) => {
+            if value > *existing {
+                *current = Some(value);
+            }
+        }
+        None => {
+            *current = Some(value);
+        }
+    }
+}
+
+fn is_gui_process(environ: &[String]) -> bool {
+    environ.iter().any(|entry| {
+        entry.starts_with("DISPLAY=")
+            || entry.starts_with("WAYLAND_DISPLAY=")
+            || entry.starts_with("MIR_SOCKET=")
+    })
+}
+
+fn is_non_root_user(user_id: Option<&Uid>) -> bool {
+    #[cfg(unix)]
+    {
+        use std::ops::Deref;
+
+        user_id.map(|id| *id.deref() != 0).unwrap_or(false)
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = user_id;
+        false
     }
 }

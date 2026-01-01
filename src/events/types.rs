@@ -1,5 +1,4 @@
-
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyEvent, MouseEvent};
 
 use crate::data::gpu::GpuSnapshot;
 
@@ -8,6 +7,8 @@ use crate::data::gpu::GpuSnapshot;
 pub enum AppEvent {
     /// Terminal key press
     Key(KeyEvent),
+    /// Mouse input
+    Mouse(MouseEvent),
     /// Periodic tick for refresh
     Tick,
     /// GPU data update from monitor thread

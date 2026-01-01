@@ -17,6 +17,7 @@ pub struct Config {
     pub sort_key: SortKey,
     pub sort_dir: SortDir,
     pub gpu_pref: GpuPreference,
+    pub gpu_poll_rate: Duration,
 }
 
 /// File-based configuration (TOML)
@@ -71,6 +72,7 @@ impl Config {
         // Start with file config values
         let mut tick_ms = file_config.general.tick_rate_ms;
         let mut vram_enabled = file_config.display.show_vram;
+        let mut gpu_poll_ms = file_config.general.gpu_poll_ms;
         let mut sort_key =
             SortKey::parse(&file_config.display.default_sort).unwrap_or(SortKey::Cpu);
         let mut sort_dir: Option<SortDir> = if file_config.display.sort_dir.is_empty() {
@@ -123,6 +125,7 @@ impl Config {
         }
 
         tick_ms = normalize_tick_ms(tick_ms);
+        gpu_poll_ms = normalize_gpu_poll_ms(gpu_poll_ms);
         let sort_dir = sort_dir.unwrap_or_else(|| sort_key.default_dir());
 
         Ok(Self {
@@ -131,6 +134,7 @@ impl Config {
             sort_key,
             sort_dir,
             gpu_pref,
+            gpu_poll_rate: Duration::from_millis(gpu_poll_ms),
         })
     }
 }
@@ -156,7 +160,7 @@ fn usage() -> String {
         "Options:",
         "  --tick-ms <ms>     Refresh interval in milliseconds (default: 1000, min: 100)",
         "  --no-vram          Disable GPU probing",
-        "  --sort <key>       pid | cpu | mem | uptime | stat | name",
+        "  --sort <key>       pid | user | cpu | mem | uptime | stat | name",
         "  --sort-dir <dir>   asc | desc",
         "  --gpu <pref>       auto | discrete | integrated",
         "  -h, --help         Show this help",
@@ -178,6 +182,10 @@ fn usage() -> String {
 }
 
 fn normalize_tick_ms(value: u64) -> u64 {
+    value.max(MIN_TICK_MS)
+}
+
+fn normalize_gpu_poll_ms(value: u64) -> u64 {
     value.max(MIN_TICK_MS)
 }
 

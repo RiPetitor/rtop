@@ -1,14 +1,32 @@
+use std::cmp::Ordering;
+use std::collections::HashMap;
+
 use ratatui::prelude::*;
-use ratatui::widgets::{Cell, HighlightSpacing, Row, Table, TableState};
+use ratatui::widgets::{Cell, HighlightSpacing, Paragraph, Row, Table, TableState};
 
 use super::panel_block;
-use super::theme::{COLOR_ACCENT, COLOR_MUTED};
-use crate::app::App;
+use super::theme::{COLOR_ACCENT, COLOR_GOOD, COLOR_MUTED};
+use crate::app::{App, HighlightMode};
 use crate::data::SortKey;
-use crate::utils::{format_bytes, format_duration_short};
+use crate::utils::{fit_text, format_bytes, format_duration_short};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
-    let max_rows = area.height.saturating_sub(3) as usize;
+    let process_area = area;
+    update_process_header_regions(app, process_area);
+    let panel_title = if app.tree_view {
+        "Processes (Tree)"
+    } else {
+        "Processes"
+    };
+    let name_width = app
+        .process_header_regions
+        .iter()
+        .find(|region| region.key == SortKey::Name)
+        .map(|region| region.rect.width as usize)
+        .unwrap_or(0)
+        .max(1);
+
+    let max_rows = process_area.height.saturating_sub(3) as usize;
     app.ensure_visible(max_rows);
 
     let start = app.scroll.min(app.rows.len());
@@ -19,22 +37,44 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         &[]
     };
 
+    let tree_labels = if app.tree_view {
+        Some(&app.tree_labels)
+    } else {
+        None
+    };
+
     let table_rows = visible_rows
         .iter()
         .map(|row| {
+            let highlight = match app.highlight_mode {
+                HighlightMode::CurrentUser => row.is_current_user,
+                HighlightMode::NonRoot => row.is_non_root,
+                HighlightMode::Gui => row.is_gui,
+            };
+            let name_text = tree_labels
+                .and_then(|labels| labels.get(&row.pid))
+                .map(|label| fit_text(label, name_width))
+                .unwrap_or_else(|| row.name.clone());
+            let name_cell = if highlight {
+                Cell::from(name_text).style(Style::default().fg(COLOR_GOOD))
+            } else {
+                Cell::from(name_text)
+            };
             Row::new(vec![
-                row.pid.to_string(),
-                format!("{:>5.1}", row.cpu),
-                format_bytes(row.mem_bytes),
-                format_duration_short(row.uptime_secs),
-                row.status.clone(),
-                row.name.clone(),
+                Cell::from(row.pid.to_string()),
+                Cell::from(row.user.clone().unwrap_or_else(|| "-".to_string())),
+                Cell::from(format!("{:>5.1}", row.cpu)),
+                Cell::from(format_bytes(row.mem_bytes)),
+                Cell::from(format_duration_short(row.uptime_secs)),
+                Cell::from(row.status.clone()),
+                name_cell,
             ])
         })
         .collect::<Vec<_>>();
 
     let header = Row::new(vec![
         header_cell(app, SortKey::Pid, "PID"),
+        header_cell(app, SortKey::User, "USER"),
         header_cell(app, SortKey::Cpu, "CPU%"),
         header_cell(app, SortKey::Mem, "MEM"),
         header_cell(app, SortKey::Uptime, "UPTIME"),
@@ -46,15 +86,16 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         table_rows,
         [
             Constraint::Length(7),
-            Constraint::Length(6),
-            Constraint::Length(10),
-            Constraint::Length(10),
             Constraint::Length(8),
+            Constraint::Length(6),
+            Constraint::Length(9),
+            Constraint::Length(7),
+            Constraint::Length(7),
             Constraint::Min(10),
         ],
     )
     .header(header)
-    .block(panel_block("Processes"))
+    .block(panel_block(panel_title))
     .column_spacing(1)
     .highlight_style(
         Style::default()
@@ -72,7 +113,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         }
     }
 
-    frame.render_stateful_widget(table, area, &mut state);
+    frame.render_stateful_widget(table, process_area, &mut state);
 }
 
 fn header_cell(app: &App, key: SortKey, label: &str) -> Cell<'static> {
@@ -97,4 +138,192 @@ fn header_cell(app: &App, key: SortKey, label: &str) -> Cell<'static> {
     };
 
     Cell::from(format!("{label}{indicator}")).style(style)
+}
+
+pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &App) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+
+    let Some(selected_id) = app.selected_gpu().map(|(_, gpu)| gpu.id.as_str()) else {
+        let paragraph = Paragraph::new("No GPU selected")
+            .block(panel_block("GPU Processes"))
+            .alignment(Alignment::Center);
+        frame.render_widget(paragraph, area);
+        return;
+    };
+
+    let name_map = build_name_map(app);
+    let mut rows = app
+        .gpu_processes
+        .iter()
+        .filter(|entry| entry.gpu_id == selected_id)
+        .map(|entry| GpuProcessRow {
+            pid: entry.pid,
+            name: name_map
+                .get(&entry.pid)
+                .copied()
+                .unwrap_or("<exited>")
+                .to_string(),
+            kind: entry.kind,
+            sm_pct: entry.sm_pct,
+            mem_pct: entry.mem_pct,
+            enc_pct: entry.enc_pct,
+            dec_pct: entry.dec_pct,
+            fb_mb: entry.fb_mb,
+        })
+        .collect::<Vec<_>>();
+
+    rows.sort_by(|a, b| {
+        let a_sm = a.sm_pct.unwrap_or(-1.0);
+        let b_sm = b.sm_pct.unwrap_or(-1.0);
+        b_sm.partial_cmp(&a_sm)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| b.fb_mb.unwrap_or(0).cmp(&a.fb_mb.unwrap_or(0)))
+            .then_with(|| a.pid.cmp(&b.pid))
+    });
+
+    if rows.is_empty() {
+        let paragraph = Paragraph::new("No GPU processes")
+            .block(panel_block("GPU Processes"))
+            .alignment(Alignment::Center);
+        frame.render_widget(paragraph, area);
+        return;
+    }
+
+    let max_rows = area.height.saturating_sub(3) as usize;
+    let table_rows = rows
+        .iter()
+        .take(max_rows)
+        .map(|row| {
+            Row::new(vec![
+                row.pid.to_string(),
+                row.kind
+                    .map(|kind| kind.to_string())
+                    .unwrap_or_else(|| "-".to_string()),
+                format_optional_pct(row.sm_pct),
+                format_optional_pct(row.mem_pct),
+                format_optional_pct(row.enc_pct),
+                format_optional_pct(row.dec_pct),
+                format_fb_mb(row.fb_mb),
+                row.name.clone(),
+            ])
+        })
+        .collect::<Vec<_>>();
+
+    let header = Row::new(vec![
+        "PID", "Type", "SM%", "MEM%", "ENC%", "DEC%", "VRAM", "NAME",
+    ])
+    .style(
+        Style::default()
+            .fg(COLOR_MUTED)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    let table = Table::new(
+        table_rows,
+        [
+            Constraint::Length(7),
+            Constraint::Length(4),
+            Constraint::Length(6),
+            Constraint::Length(6),
+            Constraint::Length(6),
+            Constraint::Length(6),
+            Constraint::Length(10),
+            Constraint::Min(10),
+        ],
+    )
+    .header(header)
+    .block(panel_block("GPU Processes"))
+    .column_spacing(1);
+
+    frame.render_widget(table, area);
+}
+
+fn build_name_map(app: &App) -> HashMap<u32, &str> {
+    let mut map = HashMap::with_capacity(app.rows.len());
+    for row in &app.rows {
+        map.insert(row.pid, row.name.as_str());
+    }
+    map
+}
+
+fn format_optional_pct(value: Option<f32>) -> String {
+    value
+        .map(|pct| format!("{:>5.1}", pct))
+        .unwrap_or_else(|| "  -  ".to_string())
+}
+
+fn format_fb_mb(value: Option<u64>) -> String {
+    value
+        .map(|mb| format_bytes(mb.saturating_mul(1024 * 1024)))
+        .unwrap_or_else(|| "-".to_string())
+}
+
+struct GpuProcessRow {
+    pid: u32,
+    name: String,
+    kind: Option<char>,
+    sm_pct: Option<f32>,
+    mem_pct: Option<f32>,
+    enc_pct: Option<f32>,
+    dec_pct: Option<f32>,
+    fb_mb: Option<u64>,
+}
+
+fn update_process_header_regions(app: &mut App, area: Rect) {
+    let block = panel_block("Processes");
+    let inner = block.inner(area);
+    if inner.width == 0 || inner.height == 0 {
+        app.process_header_regions.clear();
+        return;
+    }
+
+    let spacing = 1u16;
+    let constraints = [
+        Constraint::Length(7),
+        Constraint::Length(8),
+        Constraint::Length(6),
+        Constraint::Length(9),
+        Constraint::Length(7),
+        Constraint::Length(7),
+        Constraint::Min(10),
+    ];
+    let total_spacing = spacing.saturating_mul(constraints.len().saturating_sub(1) as u16);
+    let layout_width = inner.width.saturating_sub(total_spacing);
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(constraints)
+        .split(Rect {
+            x: 0,
+            y: 0,
+            width: layout_width,
+            height: 1,
+        });
+
+    let mut regions = Vec::with_capacity(constraints.len());
+    let mut x = inner.x;
+    for (idx, rect) in layout.iter().enumerate() {
+        let key = match idx {
+            0 => SortKey::Pid,
+            1 => SortKey::User,
+            2 => SortKey::Cpu,
+            3 => SortKey::Mem,
+            4 => SortKey::Uptime,
+            5 => SortKey::Status,
+            _ => SortKey::Name,
+        };
+        regions.push(crate::app::HeaderRegion {
+            key,
+            rect: Rect {
+                x,
+                y: inner.y,
+                width: rect.width,
+                height: 1,
+            },
+        });
+        x = x.saturating_add(rect.width + spacing);
+    }
+
+    app.process_header_regions = regions;
 }

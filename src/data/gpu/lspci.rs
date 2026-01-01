@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::types::{GpuInfo, GpuKind};
+use super::types::{GpuInfo, GpuKind, GpuTelemetry};
 use crate::utils::run_command_with_timeout;
 
 pub fn probe_lspci_gpus(timeout: Duration, skip_nvidia: bool) -> Vec<GpuInfo> {
@@ -40,6 +40,7 @@ fn parse_lspci_output(output: &str, skip_nvidia: bool) -> Vec<GpuInfo> {
                 device: Some(entry.device.clone()),
                 kind: classify_gpu_kind(&entry),
                 memory: None,
+                telemetry: GpuTelemetry::default(),
             })
         })
         .collect()
@@ -70,6 +71,7 @@ fn parse_lspci_legacy_output(output: &str, skip_nvidia: bool) -> Vec<GpuInfo> {
                 device: Some(desc.to_string()),
                 kind: classify_gpu_kind_fields(&vendor, desc, Some(slot), None),
                 memory: None,
+                telemetry: GpuTelemetry::default(),
             })
         })
         .collect()

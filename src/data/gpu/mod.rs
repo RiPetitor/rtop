@@ -1,3 +1,4 @@
+mod drm;
 mod lspci;
 mod monitor;
 mod nvidia;
@@ -5,22 +6,37 @@ mod provider;
 mod sysfs;
 mod types;
 
+pub use drm::DrmProcessTracker;
 pub use monitor::start_gpu_monitor;
 pub use provider::{
     GpuProvider, GpuProviderRegistry, LspciProvider, NvidiaProvider, SysfsProvider,
 };
-pub use types::{GpuInfo, GpuKind, GpuMemory, GpuPreference, GpuSnapshot, PciName};
+pub use types::{
+    GpuInfo, GpuKind, GpuMemory, GpuPreference, GpuProcessUsage, GpuSnapshot, GpuTelemetry, PciName,
+};
 
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::utils::text_width;
 
 pub fn probe_gpus() -> GpuSnapshot {
+    let mut tracker = DrmProcessTracker::new();
+    probe_gpus_with_tracker(&mut tracker)
+}
+
+pub fn probe_gpus_with_tracker(tracker: &mut DrmProcessTracker) -> GpuSnapshot {
     let pci_names = pci_name_map();
     let registry = GpuProviderRegistry::with_defaults();
     let mut gpus = registry.probe_all();
     normalize_gpu_names(&mut gpus, &pci_names);
-    GpuSnapshot { gpus }
+    let mut process_sources = Vec::new();
+    if gpus.iter().any(|gpu| gpu.id.starts_with("nvidia:")) {
+        process_sources.push(nvidia::probe_nvidia_processes(Duration::from_millis(800)));
+    }
+    process_sources.push(tracker.sample_processes());
+    let processes = merge_process_lists(process_sources);
+    GpuSnapshot { gpus, processes }
 }
 
 #[cfg(all(target_os = "linux", feature = "pci-names"))]
@@ -73,6 +89,57 @@ pub fn merge_gpu_lists_multi(sources: Vec<Vec<GpuInfo>>) -> Vec<GpuInfo> {
     by_id.into_values().collect()
 }
 
+fn merge_process_lists(sources: Vec<Vec<GpuProcessUsage>>) -> Vec<GpuProcessUsage> {
+    let mut by_key: HashMap<(String, u32), GpuProcessUsage> = HashMap::new();
+    for list in sources {
+        for usage in list {
+            by_key
+                .entry((usage.gpu_id.clone(), usage.pid))
+                .and_modify(|current| merge_process_usage(current, &usage))
+                .or_insert(usage);
+        }
+    }
+    by_key.into_values().collect()
+}
+
+fn merge_process_usage(current: &mut GpuProcessUsage, incoming: &GpuProcessUsage) {
+    current.kind = merge_kind(current.kind, incoming.kind);
+    merge_optional_max(&mut current.sm_pct, incoming.sm_pct);
+    merge_optional_max(&mut current.mem_pct, incoming.mem_pct);
+    merge_optional_max(&mut current.enc_pct, incoming.enc_pct);
+    merge_optional_max(&mut current.dec_pct, incoming.dec_pct);
+    if let Some(fb_mb) = incoming.fb_mb {
+        let merged = current.fb_mb.unwrap_or(0).max(fb_mb);
+        current.fb_mb = Some(merged);
+    }
+}
+
+fn merge_optional_max(current: &mut Option<f32>, incoming: Option<f32>) {
+    let Some(value) = incoming else {
+        return;
+    };
+    match current {
+        Some(existing) => {
+            if value > *existing {
+                *current = Some(value);
+            }
+        }
+        None => {
+            *current = Some(value);
+        }
+    }
+}
+
+fn merge_kind(current: Option<char>, incoming: Option<char>) -> Option<char> {
+    match (current, incoming) {
+        (Some('C'), _) => Some('C'),
+        (Some('G'), Some('C')) => Some('C'),
+        (None, Some(kind)) => Some(kind),
+        (Some(kind), _) => Some(kind),
+        _ => None,
+    }
+}
+
 fn merge_gpu_info(current: &mut GpuInfo, incoming: &GpuInfo) {
     if current.kind == GpuKind::Unknown && incoming.kind != GpuKind::Unknown {
         current.kind = incoming.kind;
@@ -80,6 +147,7 @@ fn merge_gpu_info(current: &mut GpuInfo, incoming: &GpuInfo) {
     if current.memory.is_none() && incoming.memory.is_some() {
         current.memory.clone_from(&incoming.memory);
     }
+    current.telemetry.merge_from(&incoming.telemetry);
     if current.vendor.is_none() && incoming.vendor.is_some() {
         current.vendor.clone_from(&incoming.vendor);
     }
@@ -185,6 +253,7 @@ mod tests {
                 device: Some("UHD".to_string()),
                 kind: GpuKind::Integrated,
                 memory: None,
+                telemetry: GpuTelemetry::default(),
             },
             GpuInfo {
                 id: "nvidia:0".to_string(),
@@ -193,6 +262,7 @@ mod tests {
                 device: Some("RTX".to_string()),
                 kind: GpuKind::Discrete,
                 memory: None,
+                telemetry: GpuTelemetry::default(),
             },
         ];
 

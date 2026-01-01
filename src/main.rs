@@ -3,7 +3,7 @@ use std::io;
 use std::time::{Duration, Instant};
 
 use crossterm::cursor::Show;
-use crossterm::event::{self, Event, KeyEventKind};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn setup_terminal() -> io::Result<AppTerminal> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
@@ -51,7 +51,11 @@ fn setup_terminal() -> io::Result<AppTerminal> {
 
 fn restore_terminal(terminal: &mut AppTerminal) -> io::Result<()> {
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
     Ok(())
 }
@@ -67,7 +71,7 @@ fn install_panic_hook() {
 fn restore_terminal_raw() {
     let _ = disable_raw_mode();
     let mut stdout = io::stdout();
-    let _ = execute!(stdout, LeaveAlternateScreen, Show);
+    let _ = execute!(stdout, LeaveAlternateScreen, DisableMouseCapture, Show);
 }
 
 fn run_app(terminal: &mut AppTerminal, app: &mut App, tick_rate: Duration) -> io::Result<()> {
@@ -81,6 +85,7 @@ fn run_app(terminal: &mut AppTerminal, app: &mut App, tick_rate: Duration) -> io
         if event::poll(timeout)? {
             let event = match event::read()? {
                 Event::Key(key) if key.kind == KeyEventKind::Press => AppEvent::Key(key),
+                Event::Mouse(mouse) => AppEvent::Mouse(mouse),
                 Event::Resize(w, h) => AppEvent::Resize(w, h),
                 _ => continue,
             };
