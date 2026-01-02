@@ -1,27 +1,180 @@
 # rtop
 
-Терминальный монитор системы для Linux с поддержкой GPU.
+[EN](#english) | [RU](#ru)
 
 ![Rust](https://img.shields.io/badge/Rust-1.85+-orange?logo=rust)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux-green)
 
-## Возможности
+<a id="english"></a>
+## English
 
-- **Процессы** — CPU, память, аптайм, статус
+Terminal system monitor for Linux with GPU and container support.
+
+### Features
+
+- **Processes** — CPU, memory, uptime, status + process tree
+- **Sorting and filters** — hotkeys + mouse column sorting
 - **GPU** — NVIDIA (nvidia-smi), AMD/Intel (sysfs/lspci)
-- **VRAM** — использование памяти видеокарты в реальном времени
-- **Дерево процессов** — раскрытие parent→child в Processes
-- **Сортировка и фильтры** — быстрые клавиши + клики мышью по заголовкам
-- **Системная вкладка** — расширенная информация + цветной ASCII‑логотип
-- **Контейнеры** — список контейнеров и drill‑down в процессы
-- **Setup/Help** — модальные окна (F2/F12)
+- **GPU processes** — per-process load/VRAM (nvidia-smi, DRM fdinfo)
+- **VRAM** — realtime GPU memory usage
+- **System tab** — extended info + colored ASCII logo
+- **Containers** — list, net rate and drill-down into processes
+- **Setup/Help** — modal windows (F2/F12) + language toggle (EN/RU)
 
-## Установка
+### Installation
+
+Requires Rust 1.85+.
 
 ```bash
 # Clone and build
-git clone https://github.com/yourusername/rtop.git
+git clone https://github.com/RiPetitor/rtop.git
+cd rtop
+cargo build --release
+
+# Install
+cargo install --path .
+```
+
+### Optional: PCI device names
+
+For human-readable GPU names instead of hex IDs:
+
+```bash
+cargo build --release --features pci-names
+```
+
+Requires `libpci-dev` / `pciutils-devel`.
+
+### Usage
+
+```bash
+rtop [options]
+```
+
+Minimum terminal size: 60x22.
+
+### Options
+
+| Option | Description |
+|------|----------|
+| `--tick-ms <ms>` | Refresh interval (default 1000, min 100) |
+| `--no-vram` | Disable GPU probing |
+| `--sort <key>` | Sorting: `pid`, `user`, `cpu`, `mem`, `uptime`, `stat`, `name` |
+| `--sort-dir <dir>` | Direction: `asc`, `desc` |
+| `--gpu <pref>` | GPU preference: `auto`, `discrete`, `integrated` |
+| `-h, --help` | Show help |
+
+### Hotkeys
+
+| Key | Action |
+|--------|----------|
+| `q` / `Ctrl+C` | Quit |
+| `↑` / `↓` | Navigate processes |
+| `←` / `→` | Change sort column |
+| `Space` | Toggle sort direction |
+| `Enter` | Action (terminate process / open container) |
+| `c` / `m` / `p` / `n` / `u` | Quick sort CPU/Mem/PID/Name/User |
+| `h` | Highlight processes (user/non-root/GUI) |
+| `g` / `G` | Next/previous GPU |
+| `t` | Process tree (Processes/Overview only) |
+| `1` / `2` / `3` / `4` / `5` | Overview / System / GPU / Containers / Processes |
+| `Tab` | Cycle views (Overview → Processes → GPU → System → Containers) |
+| `b` / `Esc` | Back from container drill-down |
+| `F2` | Setup |
+| `F12` | Help |
+| `r` | Force refresh |
+
+### Mouse
+
+- Left click column header — sort by column / toggle direction.
+- In tree mode, sorting is fixed by PID.
+
+### Configuration
+
+File: `~/.config/rtop/config.toml`
+
+```toml
+[general]
+tick_rate_ms = 1000
+gpu_poll_ms = 2000
+
+[display]
+show_vram = true
+default_sort = "cpu"
+sort_dir = "desc"
+gpu_preference = "auto"
+language = "en"
+```
+
+CLI args override the config.
+Language is saved to the config when toggled in Setup (`en` / `ru`).
+
+### Architecture
+
+```
+src/
+├── main.rs              # Entry point
+├── lib.rs               # Public API
+├── error.rs             # Error types
+├── app/                 # Application state & config
+├── data/                # Data models
+│   └── gpu/             # GPU providers (nvidia, lspci, sysfs)
+├── events/              # Event handling
+├── ui/                  # TUI rendering
+└── utils/               # Helpers
+```
+
+### GPU detection
+
+rtop uses multiple sources:
+
+1. **nvidia-smi** — NVIDIA GPUs with VRAM
+2. **lspci** — PCI enumeration
+3. **sysfs** — `/sys/class/drm` for AMD/Intel
+
+Results are merged with nvidia-smi priority for NVIDIA.
+GPU processes use `nvidia-smi pmon` and `/proc/*/fdinfo` (DRM).
+
+### ASCII logos
+
+Docs for adding logos: `docs/ASCII_LOGOS.md`.
+
+### Dependencies
+
+- [ratatui](https://github.com/ratatui-org/ratatui) — TUI framework
+- [crossterm](https://github.com/crossterm-rs/crossterm) — Terminal handling
+- [sysinfo](https://github.com/GuillaumeGomez/sysinfo) — System information
+- [serde](https://github.com/serde-rs/serde) + [toml](https://github.com/toml-rs/toml) — Config parsing
+- [thiserror](https://github.com/dtolnay/thiserror) — Error handling
+
+### License
+
+MIT
+
+<a id="ru"></a>
+## Русский
+
+Терминальный монитор системы для Linux с поддержкой GPU и контейнеров.
+
+### Возможности
+
+- **Процессы** — CPU, память, аптайм, статус + дерево процессов
+- **Сортировка и фильтры** — быстрые клавиши + клики мышью по заголовкам
+- **GPU** — NVIDIA (nvidia-smi), AMD/Intel (sysfs/lspci)
+- **GPU процессы** — загрузка/VRAM по процессам (nvidia-smi, DRM fdinfo)
+- **VRAM** — использование памяти видеокарты в реальном времени
+- **Системная вкладка** — расширенная информация + цветной ASCII‑логотип
+- **Контейнеры** — список контейнеров, net‑rate и drill‑down в процессы
+- **Setup/Help** — модальные окна (F2/F12) + переключение языка (EN/RU)
+
+### Установка
+
+Требуется Rust 1.85+.
+
+```bash
+# Clone and build
+git clone https://github.com/RiPetitor/rtop.git
 cd rtop
 cargo build --release
 
@@ -39,11 +192,13 @@ cargo build --release --features pci-names
 
 Нужен пакет `libpci-dev` / `pciutils-devel`.
 
-## Использование
+### Использование
 
 ```bash
 rtop [options]
 ```
+
+Минимальный размер терминала: 60x22.
 
 ### Опции
 
@@ -64,13 +219,13 @@ rtop [options]
 | `↑` / `↓` | Навигация по процессам |
 | `←` / `→` | Смена колонки сортировки |
 | `Space` | Переключить направление сортировки |
-| `Enter` | Завершить процесс (с подтверждением) |
+| `Enter` | Действие (завершить процесс / открыть контейнер) |
 | `c` / `m` / `p` / `n` / `u` | Быстрая сортировка CPU/Mem/PID/Name/User |
 | `h` | Подсветка процессов (user/non‑root/GUI) |
 | `g` / `G` | Следующий/предыдущий GPU |
-| `t` | Дерево процессов (только в Processes) |
-| `1` / `2` / `3` / `4` | Overview / System / GPU / Containers |
-| `Tab` | Циклическое переключение вкладок |
+| `t` | Дерево процессов (только в Processes/Overview) |
+| `1` / `2` / `3` / `4` / `5` | Обзор / Система / GPU / Контейнеры / Процессы |
+| `Tab` | Циклическое переключение вкладок (Обзор → Процессы → GPU → Система → Контейнеры) |
 | `b` / `Esc` | Назад из контейнерного drill‑down |
 | `F2` | Setup |
 | `F12` | Help |
@@ -81,7 +236,7 @@ rtop [options]
 - ЛКМ по заголовку колонки — сортировка по колонке / смена направления.
 - В режиме дерева сортировка фиксирована по PID.
 
-## Конфигурация
+### Конфигурация
 
 Файл: `~/.config/rtop/config.toml`
 
@@ -99,8 +254,9 @@ language = "en"
 ```
 
 CLI‑аргументы имеют приоритет над конфигом.
+Язык сохраняется в конфиге при переключении в Setup (`en` / `ru`).
 
-## Архитектура
+### Архитектура
 
 ```
 src/
@@ -115,7 +271,7 @@ src/
 └── utils/               # Helpers
 ```
 
-## GPU детекция
+### GPU детекция
 
 rtop использует несколько источников:
 
@@ -124,12 +280,13 @@ rtop использует несколько источников:
 3. **sysfs** — `/sys/class/drm` для AMD/Intel
 
 Результаты объединяются с приоритетом nvidia-smi для NVIDIA.
+Для GPU процессов используются `nvidia-smi pmon` и `/proc/*/fdinfo` (DRM).
 
-## ASCII‑логотипы
+### ASCII‑логотипы
 
 Документация для добавления логотипов: `docs/ASCII_LOGOS.md`.
 
-## Зависимости
+### Зависимости
 
 - [ratatui](https://github.com/ratatui-org/ratatui) — TUI framework
 - [crossterm](https://github.com/crossterm-rs/crossterm) — Terminal handling
@@ -137,6 +294,6 @@ rtop использует несколько источников:
 - [serde](https://github.com/serde-rs/serde) + [toml](https://github.com/toml-rs/toml) — Config parsing
 - [thiserror](https://github.com/dtolnay/thiserror) — Error handling
 
-## Лицензия
+### Лицензия
 
 MIT
