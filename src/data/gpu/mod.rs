@@ -239,6 +239,73 @@ fn short_vendor_name(vendor: &str) -> &'static str {
     "GPU"
 }
 
+/// Извлекает короткое имя модели GPU из полного описания
+/// "Navi 32 [Radeon RX 7700 XT / 7800 XT]" -> "RX 7700 XT"
+/// "Advanced Micro Devices, Inc. [AMD/ATI] Navi 32 [Radeon RX 7700 XT / 7800 XT]" -> "RX 7700 XT"
+/// "GeForce RTX 4080" -> "RTX 4080"
+pub fn short_device_name(device: &str) -> String {
+    // Ищем последние квадратные скобки (там обычно модель)
+    // Пропускаем [AMD/ATI], [NVIDIA] и подобные
+    let mut best_match: Option<String> = None;
+    let mut search_from = 0;
+
+    while let Some(start) = device[search_from..].find('[') {
+        let abs_start = search_from + start;
+        if let Some(end) = device[abs_start..].find(']') {
+            let bracket_content = &device[abs_start + 1..abs_start + end];
+
+            // Пропускаем короткие вендорные теги типа [AMD/ATI], [NVIDIA]
+            if !bracket_content.contains("AMD/ATI")
+                && !bracket_content.contains("NVIDIA")
+                && !bracket_content.contains("Intel")
+                && bracket_content.len() > 5
+            {
+                // Извлекаем первую модель до " / "
+                let model = bracket_content
+                    .split(" / ")
+                    .next()
+                    .unwrap_or(bracket_content);
+                // Убираем префиксы типа "Radeon "
+                let cleaned = model
+                    .trim_start_matches("Radeon ")
+                    .trim_start_matches("GeForce ")
+                    .trim_start_matches("Intel ")
+                    .trim_start_matches("Arc ");
+                if !cleaned.is_empty() {
+                    best_match = Some(cleaned.to_string());
+                }
+            }
+            search_from = abs_start + end + 1;
+        } else {
+            break;
+        }
+    }
+
+    if let Some(name) = best_match {
+        return name;
+    }
+
+    // Ищем известные паттерны моделей
+    let patterns = ["RTX ", "GTX ", "RX ", "Arc ", "Iris ", "UHD ", "Quadro "];
+    for pattern in patterns {
+        if let Some(pos) = device.find(pattern) {
+            let rest = &device[pos..];
+            // Берём до конца слова/числа модели
+            let end = rest
+                .find(|c: char| c == '[' || c == '(' || c == ',')
+                .unwrap_or(rest.len());
+            return rest[..end].trim().to_string();
+        }
+    }
+
+    // Fallback: первые 20 символов
+    if device.len() > 20 {
+        format!("{}...", &device[..20])
+    } else {
+        device.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
