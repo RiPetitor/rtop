@@ -20,6 +20,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = match Config::from_args() {
         Ok(config) => config,
         Err(message) => {
+            if message.starts_with("Usage:") {
+                println!("{message}");
+                return Ok(());
+            }
             eprintln!("{message}");
             std::process::exit(1);
         }

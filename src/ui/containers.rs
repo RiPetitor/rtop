@@ -2,6 +2,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Cell, HighlightSpacing, Paragraph, Row, Table, TableState};
 
 use super::panel_block;
+use super::text::tr;
 use super::theme::COLOR_MUTED;
 use crate::app::App;
 use crate::utils::format_bytes;
@@ -12,9 +13,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     }
 
     if app.container_rows.is_empty() {
-        let paragraph = Paragraph::new("No containers detected")
-            .block(panel_block("Containers"))
-            .alignment(Alignment::Center);
+        let paragraph = Paragraph::new(tr(
+            app.language,
+            "No containers detected",
+            "Контейнеры не обнаружены",
+        ))
+        .block(panel_block(tr(app.language, "Containers", "Контейнеры")))
+        .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);
         return;
     }
@@ -44,11 +49,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         .collect::<Vec<_>>();
 
     let header = Row::new(vec![
-        Cell::from("CONTAINER"),
+        Cell::from(tr(app.language, "CONTAINER", "КОНТЕЙНЕР")),
         Cell::from("CPU%"),
-        Cell::from("MEM"),
-        Cell::from("PROCS"),
-        Cell::from("NET"),
+        Cell::from(tr(app.language, "MEM", "ПАМ")),
+        Cell::from(tr(app.language, "PROCS", "ПРОЦ")),
+        Cell::from(tr(app.language, "NET", "СЕТЬ")),
     ])
     .style(
         Style::default()
@@ -67,7 +72,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         ],
     )
     .header(header)
-    .block(panel_block("Containers"))
+    .block(panel_block(tr(app.language, "Containers", "Контейнеры")))
     .column_spacing(1)
     .row_highlight_style(
         Style::default()

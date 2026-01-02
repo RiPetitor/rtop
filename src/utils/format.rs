@@ -118,7 +118,7 @@ pub fn render_bar(pct: f32, width: usize) -> String {
     let filled = ((pct / 100.0) * width as f32).round() as usize;
     let filled = filled.min(width);
     let empty = width - filled;
-    format!("{}{}", "=".repeat(filled), ".".repeat(empty))
+    format!("{}{}", "█".repeat(filled), "░".repeat(empty))
 }
 
 #[cfg(test)]

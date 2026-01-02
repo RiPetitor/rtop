@@ -41,6 +41,21 @@ impl Language {
         }
     }
 
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.to_ascii_lowercase().as_str() {
+            "en" | "eng" | "english" => Some(Language::English),
+            "ru" | "rus" | "russian" => Some(Language::Russian),
+            _ => None,
+        }
+    }
+
+    pub fn code(self) -> &'static str {
+        match self {
+            Language::English => "en",
+            Language::Russian => "ru",
+        }
+    }
+
     pub fn toggle(self) -> Self {
         match self {
             Language::English => Language::Russian,
@@ -173,7 +188,7 @@ impl App {
             view_mode: ViewMode::default(),
             show_setup: false,
             show_help: false,
-            language: Language::English,
+            language: config.language,
         };
         app.update_rows();
         app.poll_gpu_updates();
@@ -657,7 +672,7 @@ impl App {
     }
 
     pub fn set_view_mode(&mut self, mode: ViewMode) {
-        if mode != ViewMode::Processes {
+        if mode != ViewMode::Processes && mode != ViewMode::Overview {
             self.container_filter = None;
             self.tree_view = false;
         }
@@ -672,7 +687,7 @@ impl App {
             ViewMode::SystemInfo => ViewMode::Container,
             ViewMode::Container => ViewMode::Overview,
         };
-        if next != ViewMode::Processes {
+        if next != ViewMode::Processes && next != ViewMode::Overview {
             self.container_filter = None;
             self.tree_view = false;
         }
@@ -680,7 +695,7 @@ impl App {
     }
 
     pub fn toggle_tree_view(&mut self) {
-        if self.view_mode != ViewMode::Processes {
+        if self.view_mode != ViewMode::Processes && self.view_mode != ViewMode::Overview {
             return;
         }
         self.tree_view = !self.tree_view;
@@ -707,6 +722,9 @@ impl App {
 
     pub fn toggle_language(&mut self) {
         self.language = self.language.toggle();
+        if let Err(err) = super::config::save_language_preference(self.language) {
+            self.set_status(StatusLevel::Warn, format!("Failed to save language: {err}"));
+        }
     }
 
     pub fn sort_key_for_header_click(&self, column: u16, row: u16) -> Option<SortKey> {

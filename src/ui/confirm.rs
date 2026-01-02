@@ -2,6 +2,7 @@ use ratatui::prelude::*;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
+use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_HOT, COLOR_MUTED};
 use crate::app::App;
 use crate::utils::format_bytes;
@@ -21,7 +22,10 @@ pub fn render(frame: &mut Frame, app: &App) {
     let value_style = Style::default().fg(Color::White);
 
     let lines = vec![
-        Line::from(Span::styled("Terminate process?", title_style)),
+        Line::from(Span::styled(
+            tr(app.language, "Terminate process?", "Завершить процесс?"),
+            title_style,
+        )),
         Line::from(""),
         Line::from(vec![
             Span::styled("PID ", label_style),
@@ -34,11 +38,11 @@ pub fn render(frame: &mut Frame, app: &App) {
             Span::styled(format_bytes(confirm.mem_bytes), value_style),
         ]),
         Line::from(vec![
-            Span::styled("Name ", label_style),
+            Span::styled(tr(app.language, "Name ", "Имя "), label_style),
             Span::styled(confirm.name.as_str(), value_style),
         ]),
         Line::from(vec![
-            Span::styled("Status ", label_style),
+            Span::styled(tr(app.language, "Status ", "Статус "), label_style),
             Span::styled(confirm.status.as_str(), value_style),
         ]),
         Line::from(""),
@@ -49,19 +53,25 @@ pub fn render(frame: &mut Frame, app: &App) {
                     .fg(COLOR_ACCENT)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" terminate  ", label_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "terminate", "завершить")),
+                label_style,
+            ),
             Span::styled(
                 "Esc",
                 Style::default()
                     .fg(COLOR_ACCENT)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" cancel", label_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "cancel", "отмена")),
+                label_style,
+            ),
         ]),
     ];
 
     let block = Block::default()
-        .title("Confirm")
+        .title(tr(app.language, "Confirm", "Подтверждение"))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(COLOR_HOT))
         .title_style(title_style);

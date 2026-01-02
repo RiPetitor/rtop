@@ -5,6 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
 use super::panel_block;
+use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_MUTED};
 use crate::app::App;
 use crate::utils::fit_text;
@@ -23,7 +24,7 @@ enum ChildItem {
 }
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
-    let block = panel_block("Process Graph");
+    let block = panel_block(tr(app.language, "Process Graph", "Граф процессов"));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -32,14 +33,21 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     let Some(selected_pid) = app.selected_pid else {
-        let paragraph = Paragraph::new("No process selected").alignment(Alignment::Center);
+        let paragraph =
+            Paragraph::new(tr(app.language, "No process selected", "Процесс не выбран"))
+                .alignment(Alignment::Center);
         frame.render_widget(paragraph, inner);
         return;
     };
 
     let nodes = build_nodes(app);
     if !nodes.contains_key(&selected_pid) {
-        let paragraph = Paragraph::new("Process not available").alignment(Alignment::Center);
+        let paragraph = Paragraph::new(tr(
+            app.language,
+            "Process not available",
+            "Процесс недоступен",
+        ))
+        .alignment(Alignment::Center);
         frame.render_widget(paragraph, inner);
         return;
     }
@@ -69,14 +77,17 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             lines.pop();
         }
         lines.push(Line::from(Span::styled(
-            fit_text("... truncated ...", width),
+            fit_text(
+                tr(app.language, "... truncated ...", "... обрезано ..."),
+                width,
+            ),
             Style::default().fg(COLOR_MUTED),
         )));
     }
 
     if lines.is_empty() {
         lines.push(Line::from(Span::styled(
-            "No process data",
+            tr(app.language, "No process data", "Нет данных о процессах"),
             Style::default().fg(COLOR_MUTED),
         )));
     }

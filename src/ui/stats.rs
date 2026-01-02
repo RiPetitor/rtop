@@ -3,6 +3,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
 use super::panel_block;
+use super::text::tr;
 use super::theme::{COLOR_MUTED, color_for_percent};
 use crate::app::App;
 use crate::utils::{format_bytes, percent, render_bar, text_width};
@@ -10,7 +11,7 @@ use crate::utils::{format_bytes, percent, render_bar, text_width};
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
     render_cpu_panel(frame, chunks[0], app);
@@ -18,7 +19,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn render_cpu_panel(frame: &mut Frame, area: Rect, app: &App) {
-    let block = panel_block("CPU");
+    let block = panel_block(tr(app.language, "CPU", "CPU"));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -80,7 +81,10 @@ fn render_cpu_panel(frame: &mut Frame, area: Rect, app: &App) {
     if show_note {
         let remaining = cpus.len().saturating_sub(max_tiles);
         if remaining > 0 {
-            let note = format!("+{remaining} more cores");
+            let note = match app.language {
+                crate::app::Language::English => format!("+{remaining} more cores"),
+                crate::app::Language::Russian => format!("+{remaining} ядер"),
+            };
             let note = format!("{note:>width$}");
             lines.push(Line::from(Span::styled(note, label_style)));
         }
@@ -95,12 +99,21 @@ fn render_memory_panel(frame: &mut Frame, area: Rect, app: &App) {
     let used_mem = app.system.used_memory();
     let total_swap = app.system.total_swap();
     let used_swap = app.system.used_swap();
-    let block = panel_block("Memory");
+    let block = panel_block(tr(app.language, "Memory", "Память"));
     let inner = block.inner(area);
     let total_width = inner.width.max(1) as usize;
 
     let mem_pct = percent(used_mem, total_mem);
     let swap_pct = percent(used_swap, total_swap);
+
+    // Собираем GPU память
+    let (gpu_used, gpu_total) = app
+        .selected_gpu()
+        .and_then(|(_, gpu)| gpu.memory.as_ref())
+        .map(|mem| (mem.used_bytes, mem.total_bytes))
+        .unwrap_or((0, 0));
+    let gpu_pct = percent(gpu_used, gpu_total);
+    let has_gpu = gpu_total > 0;
 
     let mem_tail_raw = format!(
         "{:>5.1}% {} / {}",
@@ -114,28 +127,54 @@ fn render_memory_panel(frame: &mut Frame, area: Rect, app: &App) {
         format_bytes(used_swap),
         format_bytes(total_swap)
     );
-    let tail_len = text_width(&mem_tail_raw).max(text_width(&swap_tail_raw));
+    let gpu_tail_raw = if has_gpu {
+        format!(
+            "{:>5.1}% {} / {}",
+            gpu_pct,
+            format_bytes(gpu_used),
+            format_bytes(gpu_total)
+        )
+    } else {
+        tr(app.language, "n/a", "н/д").to_string()
+    };
+
+    let tail_len = text_width(&mem_tail_raw)
+        .max(text_width(&swap_tail_raw))
+        .max(text_width(&gpu_tail_raw));
     let mem_tail = format!("{mem_tail_raw:>tail_len$}");
     let swap_tail = format!("{swap_tail_raw:>tail_len$}");
+    let gpu_tail = format!("{gpu_tail_raw:>tail_len$}");
 
     let base_len = 8 + tail_len;
     let bar_width = total_width.saturating_sub(base_len).max(1);
     let mem_bar = render_bar(mem_pct, bar_width);
     let swap_bar = render_bar(swap_pct, bar_width);
+    let gpu_bar = render_bar(gpu_pct, bar_width);
     let label_style = Style::default().fg(COLOR_MUTED);
 
-    let lines = vec![
+    let mem_label = format!("{:<5}", tr(app.language, "Mem", "ОЗУ"));
+    let swap_label = format!("{:<5}", tr(app.language, "Swap", "Swap"));
+    let gpu_label = format!("{:<5}", tr(app.language, "GPU", "GPU"));
+    let mut lines = vec![
         Line::from(vec![
-            Span::styled("Mem  [", label_style),
+            Span::styled(mem_label, label_style),
             Span::styled(mem_bar, Style::default().fg(color_for_percent(mem_pct))),
-            Span::styled(format!("] {mem_tail}"), label_style),
+            Span::styled(format!(" {mem_tail}"), label_style),
         ]),
         Line::from(vec![
-            Span::styled("Swap [", label_style),
+            Span::styled(swap_label, label_style),
             Span::styled(swap_bar, Style::default().fg(color_for_percent(swap_pct))),
-            Span::styled(format!("] {swap_tail}"), label_style),
+            Span::styled(format!(" {swap_tail}"), label_style),
         ]),
     ];
+
+    if has_gpu {
+        lines.push(Line::from(vec![
+            Span::styled(gpu_label, label_style),
+            Span::styled(gpu_bar, Style::default().fg(color_for_percent(gpu_pct))),
+            Span::styled(format!(" {gpu_tail}"), label_style),
+        ]));
+    }
 
     let paragraph = Paragraph::new(lines).block(block);
     frame.render_widget(paragraph, area);

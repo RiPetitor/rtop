@@ -2,6 +2,7 @@ use ratatui::prelude::*;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
+use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_BORDER, COLOR_MUTED};
 use crate::app::{App, Language};
 
@@ -32,47 +33,57 @@ pub fn render(frame: &mut Frame, app: &App) {
         hint_style
     };
 
+    let ru_label = tr(app.language, "Russian", "Русский");
     let lines = vec![
-        Line::from(Span::styled("Setup", label_style)),
+        Line::from(Span::styled(
+            tr(app.language, "Setup", "Настройки"),
+            label_style,
+        )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("Language: ", label_style),
+            Span::styled(tr(app.language, "Language: ", "Язык: "), label_style),
             Span::styled("English", en_style),
             Span::styled("  ", hint_style),
-            Span::styled("Russian", ru_style),
+            Span::styled(ru_label, ru_style),
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("Theme: ", label_style),
-            Span::styled("(coming soon)", hint_style),
+            Span::styled(tr(app.language, "Theme: ", "Тема: "), label_style),
+            Span::styled(tr(app.language, "(coming soon)", "(скоро)"), hint_style),
         ]),
         Line::from(vec![
-            Span::styled("Layout: ", label_style),
-            Span::styled("(coming soon)", hint_style),
+            Span::styled(tr(app.language, "Layout: ", "Макет: "), label_style),
+            Span::styled(tr(app.language, "(coming soon)", "(скоро)"), hint_style),
         ]),
         Line::from(vec![
-            Span::styled("Columns: ", label_style),
-            Span::styled("(coming soon)", hint_style),
+            Span::styled(tr(app.language, "Columns: ", "Колонки: "), label_style),
+            Span::styled(tr(app.language, "(coming soon)", "(скоро)"), hint_style),
         ]),
         Line::from(vec![
-            Span::styled("Refresh rate: ", label_style),
-            Span::styled("(coming soon)", hint_style),
+            Span::styled(tr(app.language, "Refresh rate: ", "Частота: "), label_style),
+            Span::styled(tr(app.language, "(coming soon)", "(скоро)"), hint_style),
         ]),
         Line::from(vec![
-            Span::styled("GPU: ", label_style),
-            Span::styled("(coming soon)", hint_style),
+            Span::styled(tr(app.language, "GPU: ", "GPU: "), label_style),
+            Span::styled(tr(app.language, "(coming soon)", "(скоро)"), hint_style),
         ]),
         Line::from(""),
         Line::from(vec![
             Span::styled("Left/Right", key_style),
-            Span::styled(" toggle language  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "toggle language", "смена языка")),
+                hint_style,
+            ),
             Span::styled("Esc", key_style),
-            Span::styled(" close", hint_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "close", "закрыть")),
+                hint_style,
+            ),
         ]),
     ];
 
     let block = Block::default()
-        .title("Setup")
+        .title(tr(app.language, "Setup", "Настройки"))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(COLOR_BORDER))
         .title_style(

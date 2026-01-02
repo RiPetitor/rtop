@@ -8,6 +8,7 @@ mod processes;
 mod setup;
 mod stats;
 mod system;
+mod text;
 pub mod theme;
 mod widgets;
 
@@ -15,15 +16,20 @@ use ratatui::prelude::*;
 use ratatui::widgets::*;
 
 use crate::app::{App, ViewMode};
+use text::tr;
 use theme::COLOR_BORDER;
 
 pub fn render(frame: &mut Frame, app: &mut App) {
     app.process_header_regions.clear();
     let size = frame.area();
     if size.width < 60 || size.height < 22 {
-        let msg = Paragraph::new("Terminal too small. Resize to at least 60x22.")
-            .block(panel_block("rtop"))
-            .alignment(Alignment::Center);
+        let msg = Paragraph::new(tr(
+            app.language,
+            "Terminal too small. Resize to at least 60x22.",
+            "Терминал слишком мал. Увеличьте до 60x22 минимум.",
+        ))
+        .block(panel_block("rtop"))
+        .alignment(Alignment::Center);
         frame.render_widget(msg, size);
         return;
     }

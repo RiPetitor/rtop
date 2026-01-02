@@ -5,12 +5,13 @@ use std::fs;
 use sysinfo::System;
 
 use super::panel_block;
+use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_MUTED};
 use crate::app::App;
 use crate::utils::{fit_text, format_bytes, format_duration};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
-    let block = panel_block("System");
+    let block = panel_block(tr(app.language, "System", "Система"));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -67,11 +68,12 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     let value_style = Style::default().fg(Color::White);
     let width = area.width.max(1) as usize;
 
-    let host = System::host_name().unwrap_or_else(|| "unknown".to_string());
-    let user = app.current_user_name().unwrap_or("unknown");
+    let unknown = tr(app.language, "unknown", "неизвестно");
+    let host = System::host_name().unwrap_or_else(|| unknown.to_string());
+    let user = app.current_user_name().unwrap_or(unknown);
     let user_host = format!("{user}@{host}");
 
-    let os_name = System::name().unwrap_or_else(|| "unknown".to_string());
+    let os_name = System::name().unwrap_or_else(|| unknown.to_string());
     let os_version = System::os_version().unwrap_or_default();
     let os_line = if os_version.is_empty() {
         os_name
@@ -79,7 +81,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
         format!("{os_name} {os_version}")
     };
 
-    let kernel = System::kernel_version().unwrap_or_else(|| "unknown".to_string());
+    let kernel = System::kernel_version().unwrap_or_else(|| unknown.to_string());
     let uptime = format_duration(System::uptime());
     let load = System::load_average();
     let cpu_brand = app
@@ -103,22 +105,42 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
             gpu.name.clone()
         }
     } else {
-        "n/a".to_string()
+        tr(app.language, "n/a", "н/д").to_string()
     };
 
     let mut lines = Vec::new();
+    let label_user = format!("{:<6}", tr(app.language, "User", "Польз."));
+    let label_host = format!("{:<6}", tr(app.language, "Host", "Хост"));
+    let label_os = format!("{:<6}", tr(app.language, "OS", "ОС"));
+    let label_kernel = format!("{:<6}", tr(app.language, "Kernel", "Ядро"));
+    let label_arch = format!("{:<6}", tr(app.language, "Arch", "Арх"));
+    let label_uptime = format!("{:<6}", tr(app.language, "Uptime", "Аптайм"));
+    let label_load = format!("{:<6}", tr(app.language, "Load", "Нагр."));
+    let label_cpu = format!("{:<6}", tr(app.language, "CPU", "CPU"));
+    let label_memory = format!("{:<6}", tr(app.language, "Memory", "Память"));
+    let label_swap = format!("{:<6}", tr(app.language, "Swap", "Swap"));
+    let label_gpu = format!("{:<6}", tr(app.language, "GPU", "GPU"));
+    let label_procs = format!("{:<6}", tr(app.language, "Procs", "Проц."));
+
     push_line(
         &mut lines,
-        "User  ",
+        &label_user,
         user_host,
         width,
         label_style,
         value_style,
     );
-    push_line(&mut lines, "Host  ", host, width, label_style, value_style);
     push_line(
         &mut lines,
-        "OS    ",
+        &label_host,
+        host,
+        width,
+        label_style,
+        value_style,
+    );
+    push_line(
+        &mut lines,
+        &label_os,
         os_line,
         width,
         label_style,
@@ -126,7 +148,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "Kernel",
+        &label_kernel,
         kernel,
         width,
         label_style,
@@ -134,7 +156,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "Arch  ",
+        &label_arch,
         arch.to_string(),
         width,
         label_style,
@@ -142,7 +164,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "Uptime",
+        &label_uptime,
         uptime,
         width,
         label_style,
@@ -150,7 +172,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "Load  ",
+        &label_load,
         format!("{:.2} {:.2} {:.2}", load.one, load.five, load.fifteen),
         width,
         label_style,
@@ -158,7 +180,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "CPU   ",
+        &label_cpu,
         format!("{cpu_brand} ({cpu_count} cores)"),
         width,
         label_style,
@@ -166,7 +188,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "Memory",
+        &label_memory,
         format!("{} / {}", format_bytes(used_mem), format_bytes(total_mem)),
         width,
         label_style,
@@ -174,7 +196,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "Swap  ",
+        &label_swap,
         format!("{} / {}", format_bytes(used_swap), format_bytes(total_swap)),
         width,
         label_style,
@@ -182,7 +204,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "GPU   ",
+        &label_gpu,
         gpu_label,
         width,
         label_style,
@@ -190,7 +212,7 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     );
     push_line(
         &mut lines,
-        "Procs ",
+        &label_procs,
         processes.to_string(),
         width,
         label_style,

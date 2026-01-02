@@ -2,6 +2,7 @@ use ratatui::prelude::*;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
+use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_BORDER, COLOR_MUTED};
 use crate::app::App;
 
@@ -22,73 +23,148 @@ pub fn render(frame: &mut Frame, app: &App) {
     let hint_style = Style::default().fg(COLOR_MUTED);
 
     let lines = vec![
-        Line::from(Span::styled("Quick Keys", label_style)),
+        Line::from(Span::styled(
+            tr(app.language, "Quick Keys", "Быстрые клавиши"),
+            label_style,
+        )),
         Line::from(vec![
             Span::styled("F2", key_style),
-            Span::styled(" setup  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "setup", "настройки")),
+                hint_style,
+            ),
             Span::styled("F12", key_style),
-            Span::styled(" help  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "help", "справка")),
+                hint_style,
+            ),
             Span::styled("q", key_style),
-            Span::styled(" quit", hint_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "quit", "выход")),
+                hint_style,
+            ),
         ]),
         Line::from(""),
-        Line::from(Span::styled("Navigation", label_style)),
+        Line::from(Span::styled(
+            tr(app.language, "Navigation", "Навигация"),
+            label_style,
+        )),
         Line::from(vec![
             Span::styled("Up/Down", key_style),
-            Span::styled(" move  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "move", "перемещение")),
+                hint_style,
+            ),
             Span::styled("Enter", key_style),
-            Span::styled(" action  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "action", "действие")),
+                hint_style,
+            ),
             Span::styled("Esc", key_style),
-            Span::styled(" back/close", hint_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "back/close", "назад/закрыть")),
+                hint_style,
+            ),
         ]),
         Line::from(""),
-        Line::from(Span::styled("Sorting", label_style)),
+        Line::from(Span::styled(
+            tr(app.language, "Sorting", "Сортировка"),
+            label_style,
+        )),
         Line::from(vec![
             Span::styled("Left/Right", key_style),
-            Span::styled(" column  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "column", "колонка")),
+                hint_style,
+            ),
             Span::styled("Space", key_style),
-            Span::styled(" order  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "order", "порядок")),
+                hint_style,
+            ),
             Span::styled("Mouse", key_style),
-            Span::styled(" header sort", hint_style),
+            Span::styled(
+                format!(
+                    " {}",
+                    tr(app.language, "header sort", "сортировка по заголовку")
+                ),
+                hint_style,
+            ),
         ]),
         Line::from(vec![
             Span::styled("c/m/p/n/u", key_style),
-            Span::styled(" quick sort  ", hint_style),
+            Span::styled(
+                format!(
+                    " {}  ",
+                    tr(app.language, "quick sort", "быстрая сортировка")
+                ),
+                hint_style,
+            ),
             Span::styled("h", key_style),
-            Span::styled(" highlight", hint_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "highlight", "подсветка")),
+                hint_style,
+            ),
         ]),
         Line::from(vec![
-            Span::styled("Tree mode", label_style),
-            Span::styled(" PID order only", hint_style),
+            Span::styled(tr(app.language, "Tree mode", "Дерево"), label_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "PID order only", "только PID")),
+                hint_style,
+            ),
         ]),
         Line::from(""),
-        Line::from(Span::styled("Views", label_style)),
+        Line::from(Span::styled(
+            tr(app.language, "Views", "Режимы"),
+            label_style,
+        )),
         Line::from(vec![
             Span::styled("1", key_style),
-            Span::styled(" overview  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "overview", "обзор")),
+                hint_style,
+            ),
             Span::styled("2", key_style),
-            Span::styled(" system  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "system", "система")),
+                hint_style,
+            ),
             Span::styled("3", key_style),
-            Span::styled(" gpu  ", hint_style),
+            Span::styled(format!(" {}  ", tr(app.language, "gpu", "gpu")), hint_style),
             Span::styled("4", key_style),
-            Span::styled(" containers  ", hint_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "containers", "контейнеры")),
+                hint_style,
+            ),
             Span::styled("Tab", key_style),
-            Span::styled(" cycle", hint_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "cycle", "цикл")),
+                hint_style,
+            ),
         ]),
         Line::from(vec![
             Span::styled("t", key_style),
-            Span::styled(" tree (Processes)", hint_style),
+            Span::styled(
+                format!(
+                    " {}",
+                    tr(app.language, "tree (Processes)", "дерево (Процессы)")
+                ),
+                hint_style,
+            ),
         ]),
         Line::from(""),
-        Line::from(Span::styled("GPU", label_style)),
+        Line::from(Span::styled(tr(app.language, "GPU", "GPU"), label_style)),
         Line::from(vec![
             Span::styled("g/G", key_style),
-            Span::styled(" select GPU", hint_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "select GPU", "выбор GPU")),
+                hint_style,
+            ),
         ]),
     ];
 
     let block = Block::default()
-        .title("Help")
+        .title(tr(app.language, "Help", "Справка"))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(COLOR_BORDER))
         .title_style(

@@ -5,6 +5,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Cell, HighlightSpacing, Paragraph, Row, Table, TableState};
 
 use super::panel_block;
+use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_GOOD, COLOR_MUTED};
 use crate::app::{App, HighlightMode};
 use crate::data::SortKey;
@@ -14,9 +15,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     let process_area = area;
     update_process_header_regions(app, process_area);
     let panel_title = if app.tree_view {
-        "Processes (Tree)"
+        tr(app.language, "Processes (Tree)", "Процессы (дерево)")
     } else {
-        "Processes"
+        tr(app.language, "Processes", "Процессы")
     };
     let name_width = app
         .process_header_regions
@@ -147,8 +148,12 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     let Some(selected_id) = app.selected_gpu().map(|(_, gpu)| gpu.id.as_str()) else {
-        let paragraph = Paragraph::new("No GPU selected")
-            .block(panel_block("GPU Processes"))
+        let paragraph = Paragraph::new(tr(app.language, "No GPU selected", "GPU не выбран"))
+            .block(panel_block(tr(
+                app.language,
+                "GPU Processes",
+                "Процессы GPU",
+            )))
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);
         return;
@@ -185,8 +190,12 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &App) {
     });
 
     if rows.is_empty() {
-        let paragraph = Paragraph::new("No GPU processes")
-            .block(panel_block("GPU Processes"))
+        let paragraph = Paragraph::new(tr(app.language, "No GPU processes", "Нет процессов GPU"))
+            .block(panel_block(tr(
+                app.language,
+                "GPU Processes",
+                "Процессы GPU",
+            )))
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);
         return;
@@ -235,7 +244,11 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &App) {
         ],
     )
     .header(header)
-    .block(panel_block("GPU Processes"))
+    .block(panel_block(tr(
+        app.language,
+        "GPU Processes",
+        "Процессы GPU",
+    )))
     .column_spacing(1);
 
     frame.render_widget(table, area);

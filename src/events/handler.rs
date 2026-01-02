@@ -142,6 +142,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
             app.set_view_mode(ViewMode::Container);
             EventResult::Continue
         }
+        KeyCode::Char('5') => {
+            app.set_view_mode(ViewMode::Processes);
+            EventResult::Continue
+        }
         KeyCode::Tab => {
             app.cycle_view_mode();
             EventResult::Continue

@@ -4,8 +4,9 @@ use ratatui::widgets::Paragraph;
 use sysinfo::System;
 
 use super::panel_block;
+use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_MUTED};
-use crate::app::{App, ViewMode};
+use crate::app::{App, HighlightMode, ViewMode};
 use crate::utils::{format_bytes, format_duration, percent};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
@@ -28,25 +29,38 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .add_modifier(Modifier::BOLD);
     let value_style = Style::default().fg(Color::White);
 
+    let view_label = match app.view_mode {
+        ViewMode::Overview => tr(app.language, "Overview", "Обзор"),
+        ViewMode::Processes => tr(app.language, "Processes", "Процессы"),
+        ViewMode::GpuFocus => tr(app.language, "GPU", "GPU"),
+        ViewMode::SystemInfo => tr(app.language, "System", "Система"),
+        ViewMode::Container => tr(app.language, "Containers", "Контейнеры"),
+    };
+    let highlight_label = match app.highlight_mode {
+        HighlightMode::CurrentUser => tr(app.language, "user", "польз."),
+        HighlightMode::NonRoot => tr(app.language, "non-root", "не-root"),
+        HighlightMode::Gui => tr(app.language, "gui", "gui"),
+    };
+
     let mut first_line = vec![
         Span::styled("rtop", title_style),
         Span::raw("  "),
-        Span::styled("system monitor", Style::default().fg(COLOR_MUTED)),
+        Span::styled(
+            tr(app.language, "system monitor", "монитор системы"),
+            Style::default().fg(COLOR_MUTED),
+        ),
         Span::raw("  "),
-        Span::styled("sort ", label_style),
+        Span::styled(tr(app.language, "sort ", "сорт "), label_style),
         Span::styled(
             format!("{} {}", app.sort_key.label(), app.sort_dir.label()),
             Style::default().fg(COLOR_ACCENT),
         ),
         Span::raw("  "),
-        Span::styled("view ", label_style),
-        Span::styled(app.view_mode.label(), Style::default().fg(COLOR_ACCENT)),
+        Span::styled(tr(app.language, "view ", "вид "), label_style),
+        Span::styled(view_label, Style::default().fg(COLOR_ACCENT)),
         Span::raw("  "),
-        Span::styled("highlight ", label_style),
-        Span::styled(
-            app.highlight_mode.label(),
-            Style::default().fg(COLOR_ACCENT),
-        ),
+        Span::styled(tr(app.language, "highlight ", "подсветка "), label_style),
+        Span::styled(highlight_label, Style::default().fg(COLOR_ACCENT)),
     ];
     if app.view_mode == ViewMode::Processes {
         let tree_style = if app.tree_view {
@@ -55,15 +69,25 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(COLOR_MUTED)
         };
         first_line.push(Span::raw("  "));
-        first_line.push(Span::styled("tree ", label_style));
         first_line.push(Span::styled(
-            if app.tree_view { "on" } else { "off" },
+            tr(app.language, "tree ", "дерево "),
+            label_style,
+        ));
+        first_line.push(Span::styled(
+            if app.tree_view {
+                tr(app.language, "on", "вкл")
+            } else {
+                tr(app.language, "off", "выкл")
+            },
             tree_style,
         ));
     }
     if let Some(filter) = app.container_filter.as_ref() {
         first_line.push(Span::raw("  "));
-        first_line.push(Span::styled("container ", label_style));
+        first_line.push(Span::styled(
+            tr(app.language, "container ", "контейнер "),
+            label_style,
+        ));
         first_line.push(Span::styled(
             filter.label(),
             Style::default().fg(COLOR_ACCENT),
@@ -73,9 +97,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let lines = vec![
         Line::from(first_line),
         Line::from(vec![
-            Span::styled("CPU", label_style),
+            Span::styled(tr(app.language, "CPU", "CPU"), label_style),
             Span::styled(format!(" {:>5.1}%  ", cpu), value_style),
-            Span::styled("Load", label_style),
+            Span::styled(tr(app.language, "Load", "Нагр."), label_style),
             Span::styled(
                 format!(
                     " {:>4.2} {:>4.2} {:>4.2}  ",
@@ -83,11 +107,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 ),
                 value_style,
             ),
-            Span::styled("Uptime", label_style),
+            Span::styled(tr(app.language, "Uptime", "Аптайм"), label_style),
             Span::styled(format!(" {}", uptime), value_style),
         ]),
         Line::from(vec![
-            Span::styled("Mem", label_style),
+            Span::styled(tr(app.language, "Mem", "ОЗУ"), label_style),
             Span::styled(
                 format!(
                     " {} / {} ({:>4.1}%)  ",
@@ -97,7 +121,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 ),
                 value_style,
             ),
-            Span::styled("Swap", label_style),
+            Span::styled(tr(app.language, "Swap", "Swap"), label_style),
             Span::styled(
                 format!(
                     " {} / {} ({:>4.1}%)  ",
@@ -107,7 +131,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 ),
                 value_style,
             ),
-            Span::styled("Procs", label_style),
+            Span::styled(tr(app.language, "Procs", "Проц."), label_style),
             Span::styled(format!(" {}", process_count), value_style),
         ]),
     ];

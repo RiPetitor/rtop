@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
+use super::state::Language;
 use crate::data::{GpuPreference, SortDir, SortKey};
 
 const MIN_TICK_MS: u64 = 100;
@@ -18,6 +19,7 @@ pub struct Config {
     pub sort_dir: SortDir,
     pub gpu_pref: GpuPreference,
     pub gpu_poll_rate: Duration,
+    pub language: Language,
 }
 
 /// File-based configuration (TOML)
@@ -51,6 +53,7 @@ struct DisplayConfig {
     default_sort: String,
     sort_dir: String,
     gpu_preference: String,
+    language: String,
 }
 
 impl Default for DisplayConfig {
@@ -60,6 +63,7 @@ impl Default for DisplayConfig {
             default_sort: "cpu".to_string(),
             sort_dir: String::new(),
             gpu_preference: "auto".to_string(),
+            language: "en".to_string(),
         }
     }
 }
@@ -67,7 +71,14 @@ impl Default for DisplayConfig {
 impl Config {
     pub fn from_args() -> Result<Self, String> {
         // Load file config first
-        let file_config = load_config_file().unwrap_or_default();
+        let file_config = match load_config_file() {
+            Ok(Some(config)) => config,
+            Ok(None) => FileConfig::default(),
+            Err(message) => {
+                eprintln!("{message}");
+                FileConfig::default()
+            }
+        };
 
         // Start with file config values
         let mut tick_ms = file_config.general.tick_rate_ms;
@@ -82,6 +93,7 @@ impl Config {
         };
         let mut gpu_pref = GpuPreference::parse(&file_config.display.gpu_preference)
             .unwrap_or(GpuPreference::Auto);
+        let language = Language::parse(&file_config.display.language).unwrap_or(Language::English);
 
         // Override with CLI args
         let mut args = env::args().skip(1);
@@ -135,6 +147,7 @@ impl Config {
             sort_dir,
             gpu_pref,
             gpu_poll_rate: Duration::from_millis(gpu_poll_ms),
+            language,
         })
     }
 }
@@ -143,10 +156,27 @@ fn config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|p| p.join("rtop").join("config.toml"))
 }
 
-fn load_config_file() -> Option<FileConfig> {
-    let path = config_path()?;
-    let content = fs::read_to_string(&path).ok()?;
-    toml::from_str(&content).ok()
+fn load_config_file() -> Result<Option<FileConfig>, String> {
+    let Some(path) = config_path() else {
+        return Ok(None);
+    };
+    let content = match fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(format!(
+                "Failed to read config file {}: {err}",
+                path.display()
+            ));
+        }
+    };
+    match toml::from_str(&content) {
+        Ok(config) => Ok(Some(config)),
+        Err(err) => Err(format!(
+            "Failed to parse config file {}: {err}",
+            path.display()
+        )),
+    }
 }
 
 fn usage() -> String {
@@ -177,8 +207,57 @@ fn usage() -> String {
         "  default_sort = \"cpu\"",
         "  sort_dir = \"desc\"",
         "  gpu_preference = \"auto\"",
+        "  language = \"en\"",
     ]
     .join("\n")
+}
+
+pub fn save_language_preference(language: Language) -> Result<(), String> {
+    let Some(path) = config_path() else {
+        return Err("Config path unavailable".to_string());
+    };
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Failed to create config directory: {err}"))?;
+    }
+
+    let mut root = if path.exists() {
+        match fs::read_to_string(&path) {
+            Ok(content) => content
+                .parse::<toml::Value>()
+                .unwrap_or_else(|_| toml::Value::Table(Default::default())),
+            Err(err) => {
+                return Err(format!(
+                    "Failed to read config file {}: {err}",
+                    path.display()
+                ));
+            }
+        }
+    } else {
+        toml::Value::Table(Default::default())
+    };
+
+    if !root.is_table() {
+        root = toml::Value::Table(Default::default());
+    }
+    let table = root.as_table_mut().expect("table ensured");
+    let display = table
+        .entry("display".to_string())
+        .or_insert_with(|| toml::Value::Table(Default::default()));
+    if !display.is_table() {
+        *display = toml::Value::Table(Default::default());
+    }
+    let display_table = display.as_table_mut().expect("table ensured");
+    display_table.insert(
+        "language".to_string(),
+        toml::Value::String(language.code().to_string()),
+    );
+
+    let output = toml::to_string_pretty(&root)
+        .map_err(|err| format!("Failed to serialize config: {err}"))?;
+    fs::write(&path, output)
+        .map_err(|err| format!("Failed to write config file {}: {err}", path.display()))?;
+    Ok(())
 }
 
 fn normalize_tick_ms(value: u64) -> u64 {
@@ -206,6 +285,7 @@ mod tests {
         assert_eq!(config.general.tick_rate_ms, DEFAULT_TICK_MS);
         assert!(config.display.show_vram);
         assert_eq!(config.display.default_sort, "cpu");
+        assert_eq!(config.display.language, "en");
     }
 
     #[test]
@@ -219,5 +299,6 @@ mod tests {
         .unwrap();
         assert_eq!(config.general.tick_rate_ms, DEFAULT_TICK_MS);
         assert_eq!(config.display.default_sort, "mem");
+        assert_eq!(config.display.language, "en");
     }
 }
