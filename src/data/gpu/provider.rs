@@ -113,7 +113,7 @@ impl GpuProviderRegistry {
 
         // Collect results from all providers, sorted by priority
         let mut sorted_providers: Vec<_> = self.providers.iter().collect();
-        sorted_providers.sort_by(|a, b| b.priority().cmp(&a.priority()));
+        sorted_providers.sort_by_key(|b| std::cmp::Reverse(b.priority()));
 
         let mut all_gpus: Vec<Vec<GpuInfo>> = Vec::new();
         for provider in sorted_providers {

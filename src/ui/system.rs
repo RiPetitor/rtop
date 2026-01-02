@@ -82,7 +82,12 @@ fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     let kernel = System::kernel_version().unwrap_or_else(|| "unknown".to_string());
     let uptime = format_duration(System::uptime());
     let load = System::load_average();
-    let cpu_brand = app.system.global_cpu_info().brand().to_string();
+    let cpu_brand = app
+        .system
+        .cpus()
+        .first()
+        .map(|c| c.brand().to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
     let cpu_count = app.system.cpus().len();
     let arch = std::env::consts::ARCH;
     let total_mem = app.system.total_memory();
@@ -374,10 +379,10 @@ static LOGO_SPEC_MACOS: LogoSpec = LogoSpec {
 fn select_logo() -> &'static LogoSpec {
     let os_name = System::name().unwrap_or_else(|| "unknown".to_string());
     let mut os_id = os_name.to_ascii_lowercase();
-    if os_id.contains("linux") {
-        if let Some(linux_id) = linux_os_id() {
-            os_id = linux_id;
-        }
+    if os_id.contains("linux")
+        && let Some(linux_id) = linux_os_id()
+    {
+        os_id = linux_id;
     }
 
     if os_id.contains("arch") {
@@ -430,13 +435,12 @@ fn stripped_logo_width(line: &str) -> usize {
     let mut width = 0;
     let mut chars = line.chars().peekable();
     while let Some(ch) = chars.next() {
-        if ch == '$' {
-            if let Some(next) = chars.peek() {
-                if next.is_ascii_digit() {
-                    chars.next();
-                    continue;
-                }
-            }
+        if ch == '$'
+            && let Some(next) = chars.peek()
+            && next.is_ascii_digit()
+        {
+            chars.next();
+            continue;
         }
         width += 1;
     }
@@ -450,23 +454,22 @@ fn parse_logo_line(line: &str, palette: &[Color]) -> Line<'static> {
     let mut chars = line.chars().peekable();
 
     while let Some(ch) = chars.next() {
-        if ch == '$' {
-            if let Some(next) = chars.peek() {
-                if next.is_ascii_digit() {
-                    if !buffer.is_empty() {
-                        spans.push(Span::styled(std::mem::take(&mut buffer), current_style));
-                    }
-                    let digit = chars.next().unwrap();
-                    if digit == '0' {
-                        current_style = Style::default().fg(COLOR_ACCENT);
-                    } else {
-                        let idx = (digit as u8 - b'1') as usize;
-                        let color = palette.get(idx).copied().unwrap_or(COLOR_ACCENT);
-                        current_style = Style::default().fg(color);
-                    }
-                    continue;
-                }
+        if ch == '$'
+            && let Some(next) = chars.peek()
+            && next.is_ascii_digit()
+        {
+            if !buffer.is_empty() {
+                spans.push(Span::styled(std::mem::take(&mut buffer), current_style));
             }
+            let digit = chars.next().unwrap();
+            if digit == '0' {
+                current_style = Style::default().fg(COLOR_ACCENT);
+            } else {
+                let idx = (digit as u8 - b'1') as usize;
+                let color = palette.get(idx).copied().unwrap_or(COLOR_ACCENT);
+                current_style = Style::default().fg(color);
+            }
+            continue;
         }
         buffer.push(ch);
     }

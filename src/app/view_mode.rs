@@ -1,5 +1,6 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ViewMode {
+    #[default]
     Overview,
     Processes,
     GpuFocus,
@@ -16,11 +17,5 @@ impl ViewMode {
             ViewMode::SystemInfo => "System",
             ViewMode::Container => "Containers",
         }
-    }
-}
-
-impl Default for ViewMode {
-    fn default() -> Self {
-        ViewMode::Overview
     }
 }

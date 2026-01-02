@@ -200,13 +200,13 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) -> EventResult {
         return EventResult::Continue;
     }
 
-    if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
-        if let Some(key) = app.sort_key_for_header_click(mouse.column, mouse.row) {
-            if key == app.sort_key {
-                app.toggle_sort_dir();
-            } else {
-                app.set_sort_key(key);
-            }
+    if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+        && let Some(key) = app.sort_key_for_header_click(mouse.column, mouse.row)
+    {
+        if key == app.sort_key {
+            app.toggle_sort_dir();
+        } else {
+            app.set_sort_key(key);
         }
     }
 

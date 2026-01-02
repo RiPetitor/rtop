@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use ratatui::prelude::Rect;
 use ratatui::widgets::TableState;
-use sysinfo::{Pid, Signal, System, Uid, Users};
+use sysinfo::{Pid, ProcessesToUpdate, Signal, System, Uid, Users};
 
 use super::config::Config;
 use super::highlight::HighlightMode;
@@ -182,7 +182,7 @@ impl App {
 
     pub fn refresh(&mut self) {
         self.system.refresh_all();
-        self.users.refresh_list();
+        self.users.refresh();
         self.update_rows();
         let needs_containers =
             matches!(self.view_mode, ViewMode::Container) || self.container_filter.is_some();
@@ -253,7 +253,7 @@ impl App {
                 ProcessRow {
                     pid,
                     user,
-                    name: process.name().to_string(),
+                    name: process.name().to_string_lossy().into_owned(),
                     cpu: process.cpu_usage(),
                     mem_bytes: process.memory(),
                     status: format!("{:?}", process.status()),
@@ -400,12 +400,12 @@ impl App {
                 entry.cpu += process.cpu_usage();
                 entry.mem_bytes = entry.mem_bytes.saturating_add(process.memory());
                 entry.proc_count += 1;
-                if entry.netns_id.is_none() {
-                    if let Some(netns_id) = netns_id_for_pid(pid) {
-                        entry.netns_id = Some(netns_id);
-                        netns_pids.entry(netns_id).or_insert(pid);
-                        *netns_container_counts.entry(netns_id).or_insert(0) += 1;
-                    }
+                if entry.netns_id.is_none()
+                    && let Some(netns_id) = netns_id_for_pid(pid)
+                {
+                    entry.netns_id = Some(netns_id);
+                    netns_pids.entry(netns_id).or_insert(pid);
+                    *netns_container_counts.entry(netns_id).or_insert(0) += 1;
                 }
             }
         }
@@ -549,7 +549,8 @@ impl App {
     pub fn confirm_kill(&mut self) {
         if let Some(confirm) = self.confirm.take() {
             let pid = Pid::from_u32(confirm.pid);
-            self.system.refresh_process(pid);
+            self.system
+                .refresh_processes(ProcessesToUpdate::Some(&[pid]), false);
             if let Some(process) = self.system.process(pid) {
                 if process.start_time() != confirm.start_time {
                     self.set_status(
@@ -608,10 +609,10 @@ impl App {
             return;
         }
 
-        if let Some(selected) = self.gpu_selected.as_ref() {
-            if self.gpu_list.iter().any(|gpu| &gpu.id == selected) {
-                return;
-            }
+        if let Some(selected) = self.gpu_selected.as_ref()
+            && self.gpu_list.iter().any(|gpu| &gpu.id == selected)
+        {
+            return;
         }
 
         if let Some(idx) = default_gpu_index(&self.gpu_list, self.gpu_pref) {
@@ -721,10 +722,10 @@ impl App {
     }
 
     fn clear_expired_status(&mut self) {
-        if let Some(status) = self.status.as_ref() {
-            if status.is_expired() {
-                self.status = None;
-            }
+        if let Some(status) = self.status.as_ref()
+            && status.is_expired()
+        {
+            self.status = None;
         }
     }
 
@@ -798,6 +799,7 @@ fn build_tree_layout(
     layout
 }
 
+#[allow(clippy::too_many_arguments)]
 fn push_tree_layout(
     pid: u32,
     prefix: &str,
@@ -867,11 +869,12 @@ fn merge_optional_max(current: &mut Option<f32>, incoming: Option<f32>) {
     }
 }
 
-fn is_gui_process(environ: &[String]) -> bool {
+fn is_gui_process(environ: &[std::ffi::OsString]) -> bool {
     environ.iter().any(|entry| {
-        entry.starts_with("DISPLAY=")
-            || entry.starts_with("WAYLAND_DISPLAY=")
-            || entry.starts_with("MIR_SOCKET=")
+        let s = entry.to_string_lossy();
+        s.starts_with("DISPLAY=")
+            || s.starts_with("WAYLAND_DISPLAY=")
+            || s.starts_with("MIR_SOCKET=")
     })
 }
 

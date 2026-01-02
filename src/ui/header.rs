@@ -10,7 +10,7 @@ use crate::utils::{format_bytes, format_duration, percent};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let load = System::load_average();
-    let cpu = app.system.global_cpu_info().cpu_usage();
+    let cpu = app.system.global_cpu_usage();
     let total_mem = app.system.total_memory();
     let used_mem = app.system.used_memory();
     let total_swap = app.system.total_swap();

@@ -11,7 +11,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         return;
     };
 
-    let area = centered_rect(60, 40, frame.size());
+    let area = centered_rect(60, 40, frame.area());
     frame.render_widget(Clear, area);
 
     let title_style = Style::default().fg(COLOR_HOT).add_modifier(Modifier::BOLD);

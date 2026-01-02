@@ -1,5 +1,6 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum HighlightMode {
+    #[default]
     CurrentUser,
     NonRoot,
     Gui,
@@ -20,11 +21,5 @@ impl HighlightMode {
             HighlightMode::NonRoot => HighlightMode::Gui,
             HighlightMode::Gui => HighlightMode::CurrentUser,
         }
-    }
-}
-
-impl Default for HighlightMode {
-    fn default() -> Self {
-        HighlightMode::CurrentUser
     }
 }

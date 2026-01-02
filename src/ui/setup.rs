@@ -10,13 +10,15 @@ pub fn render(frame: &mut Frame, app: &App) {
         return;
     }
 
-    let area = centered_rect(72, 70, frame.size());
+    let area = centered_rect(72, 70, frame.area());
     frame.render_widget(Clear, area);
 
     let key_style = Style::default()
         .fg(COLOR_ACCENT)
         .add_modifier(Modifier::BOLD);
-    let label_style = Style::default().fg(COLOR_MUTED).add_modifier(Modifier::BOLD);
+    let label_style = Style::default()
+        .fg(COLOR_MUTED)
+        .add_modifier(Modifier::BOLD);
     let hint_style = Style::default().fg(COLOR_MUTED);
 
     let en_style = if app.language == Language::English {
@@ -78,9 +80,7 @@ pub fn render(frame: &mut Frame, app: &App) {
                 .fg(COLOR_ACCENT)
                 .add_modifier(Modifier::BOLD),
         );
-    let paragraph = Paragraph::new(lines)
-        .block(block)
-        .wrap(Wrap { trim: true });
+    let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: true });
 
     frame.render_widget(paragraph, area);
 }

@@ -97,7 +97,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     .header(header)
     .block(panel_block(panel_title))
     .column_spacing(1)
-    .highlight_style(
+    .row_highlight_style(
         Style::default()
             .fg(Color::White)
             .bg(Color::Rgb(40, 48, 58))
@@ -107,10 +107,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     .highlight_spacing(HighlightSpacing::Always);
 
     let mut state = TableState::default();
-    if let Some(selected) = app.table_state.selected() {
-        if selected >= start && selected < end {
-            state.select(Some(selected - start));
-        }
+    if let Some(selected) = app.table_state.selected()
+        && selected >= start
+        && selected < end
+    {
+        state.select(Some(selected - start));
     }
 
     frame.render_stateful_widget(table, process_area, &mut state);

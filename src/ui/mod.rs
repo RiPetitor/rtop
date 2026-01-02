@@ -19,7 +19,7 @@ use theme::COLOR_BORDER;
 
 pub fn render(frame: &mut Frame, app: &mut App) {
     app.process_header_regions.clear();
-    let size = frame.size();
+    let size = frame.area();
     if size.width < 60 || size.height < 22 {
         let msg = Paragraph::new("Terminal too small. Resize to at least 60x22.")
             .block(panel_block("rtop"))

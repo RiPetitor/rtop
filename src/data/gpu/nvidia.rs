@@ -20,10 +20,9 @@ pub fn probe_nvidia_gpus(timeout: Duration) -> Vec<GpuInfo> {
             "--format=csv,noheader,nounits",
         ],
         timeout,
-    ) {
-        if let Some(gpus) = parse_nvidia_smi_output(&output) {
-            return gpus;
-        }
+    ) && let Some(gpus) = parse_nvidia_smi_output(&output)
+    {
+        return gpus;
     }
 
     let output = run_command_with_timeout(
@@ -58,19 +57,19 @@ pub fn probe_nvidia_processes(timeout: Duration) -> Vec<GpuProcessUsage> {
         timeout,
     ) {
         let apps = parse_nvidia_compute_apps_output(&apps_output);
-        if !apps.is_empty() {
-            if let Some(uuid_output) = run_command_with_timeout(
+        if !apps.is_empty()
+            && let Some(uuid_output) = run_command_with_timeout(
                 "nvidia-smi",
                 &[
                     &format!("--query-gpu={NVIDIA_QUERY_UUID}"),
                     "--format=csv,noheader,nounits",
                 ],
                 timeout,
-            ) {
-                let uuid_map = parse_nvidia_gpu_uuid_map(&uuid_output);
-                if !uuid_map.is_empty() {
-                    apply_compute_apps_memory(&mut by_key, &uuid_map, apps);
-                }
+            )
+        {
+            let uuid_map = parse_nvidia_gpu_uuid_map(&uuid_output);
+            if !uuid_map.is_empty() {
+                apply_compute_apps_memory(&mut by_key, &uuid_map, apps);
             }
         }
     }

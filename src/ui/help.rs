@@ -10,7 +10,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         return;
     }
 
-    let area = centered_rect(72, 70, frame.size());
+    let area = centered_rect(72, 70, frame.area());
     frame.render_widget(Clear, area);
 
     let key_style = Style::default()

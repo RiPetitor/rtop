@@ -7,6 +7,7 @@ use super::types::GpuProcessUsage;
 
 type ProcessKey = (String, u32);
 
+#[derive(Default)]
 pub struct DrmProcessTracker {
     last: HashMap<ProcessKey, DrmProcessCounters>,
     last_instant: Option<Instant>,
@@ -14,10 +15,7 @@ pub struct DrmProcessTracker {
 
 impl DrmProcessTracker {
     pub fn new() -> Self {
-        Self {
-            last: HashMap::new(),
-            last_instant: None,
-        }
+        Self::default()
     }
 
     pub fn sample_processes(&mut self) -> Vec<GpuProcessUsage> {
@@ -43,12 +41,12 @@ impl DrmProcessTracker {
                 fb_mb: bytes_to_mb(counters.preferred_mem_bytes()),
             };
 
-            if let Some(interval_ns) = interval_ns {
-                if let Some(prev) = self.last.get(key) {
-                    usage.sm_pct = compute_pct(counters.core_ns, prev.core_ns, interval_ns);
-                    usage.enc_pct = compute_pct(counters.enc_ns, prev.enc_ns, interval_ns);
-                    usage.dec_pct = compute_pct(counters.dec_ns, prev.dec_ns, interval_ns);
-                }
+            if let Some(interval_ns) = interval_ns
+                && let Some(prev) = self.last.get(key)
+            {
+                usage.sm_pct = compute_pct(counters.core_ns, prev.core_ns, interval_ns);
+                usage.enc_pct = compute_pct(counters.enc_ns, prev.enc_ns, interval_ns);
+                usage.dec_pct = compute_pct(counters.dec_ns, prev.dec_ns, interval_ns);
             }
 
             outputs.push(usage);
@@ -175,23 +173,19 @@ fn parse_fdinfo(contents: &str) -> Option<DrmFdinfoSample> {
         }
     }
 
-    if driver.is_none() {
-        return None;
-    }
+    driver?;
     let gpu_id = resolve_gpu_id(pdev, minor)?;
     sample.gpu_id = gpu_id;
     Some(sample)
 }
 
 fn resolve_gpu_id(pdev: Option<&str>, minor: Option<u32>) -> Option<String> {
-    if let Some(pdev) = pdev {
-        if !pdev.is_empty() {
-            return Some(format!("pci:{pdev}"));
-        }
+    if let Some(pdev) = pdev
+        && !pdev.is_empty()
+    {
+        return Some(format!("pci:{pdev}"));
     }
-    let Some(minor) = minor else {
-        return None;
-    };
+    let minor = minor?;
     let path = if minor >= 128 {
         Path::new("/sys/class/drm").join(format!("renderD{minor}"))
     } else {
@@ -229,7 +223,7 @@ fn bytes_to_mb(bytes: u64) -> Option<u64> {
     if bytes == 0 {
         None
     } else {
-        Some((bytes + (1024 * 1024 - 1)) / (1024 * 1024))
+        Some(bytes.div_ceil(1024 * 1024))
     }
 }
 

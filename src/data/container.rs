@@ -114,10 +114,10 @@ pub fn net_sample_for_pid(pid: u32) -> Option<NetSample> {
 
 fn parse_cgroup(contents: &str) -> Option<ContainerKey> {
     for line in contents.lines() {
-        if let Some(path) = line.splitn(3, ':').nth(2) {
-            if let Some(key) = parse_cgroup_path(path.trim()) {
-                return Some(key);
-            }
+        if let Some(path) = line.splitn(3, ':').nth(2)
+            && let Some(key) = parse_cgroup_path(path.trim())
+        {
+            return Some(key);
         }
     }
     None
@@ -178,10 +178,10 @@ fn parse_cgroup_path(path: &str) -> Option<ContainerKey> {
         return Some(ContainerKey { runtime, id });
     }
 
-    if runtime == ContainerRuntime::Kubernetes {
-        if let Some(id) = segments.iter().find_map(|segment| pod_segment(segment)) {
-            return Some(ContainerKey { runtime, id });
-        }
+    if runtime == ContainerRuntime::Kubernetes
+        && let Some(id) = segments.iter().find_map(|segment| pod_segment(segment))
+    {
+        return Some(ContainerKey { runtime, id });
     }
 
     None

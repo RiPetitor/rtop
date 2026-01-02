@@ -193,10 +193,9 @@ fn read_hwmon_fan_pct(hwmon_dirs: &[PathBuf]) -> Option<f32> {
         if let (Some(speed), Some(max)) = (
             read_u64(dir.join("fan1_input")),
             read_u64(dir.join("fan1_max")),
-        ) {
-            if max > 0 {
-                return Some((speed as f32 / max as f32) * 100.0);
-            }
+        ) && max > 0
+        {
+            return Some((speed as f32 / max as f32) * 100.0);
         }
         if let Some(pwm) = read_u64(dir.join("pwm1")) {
             let max = read_u64(dir.join("pwm1_max")).unwrap_or(255);
