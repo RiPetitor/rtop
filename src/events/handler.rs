@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::prelude::Rect;
 
 use super::types::{AppEvent, EventResult};
 use crate::app::{App, ViewMode};
@@ -51,6 +52,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
         KeyCode::Up => {
             if app.view_mode == ViewMode::Container {
                 app.move_container_selection(-1);
+            } else if app.view_mode == ViewMode::GpuFocus {
+                app.move_gpu_process_selection(-1);
             } else {
                 app.move_selection(-1);
             }
@@ -59,8 +62,55 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
         KeyCode::Down => {
             if app.view_mode == ViewMode::Container {
                 app.move_container_selection(1);
+            } else if app.view_mode == ViewMode::GpuFocus {
+                app.move_gpu_process_selection(1);
             } else {
                 app.move_selection(1);
+            }
+            EventResult::Continue
+        }
+        KeyCode::Home => {
+            if app.view_mode == ViewMode::GpuFocus {
+                app.select_gpu_process_first();
+            } else if matches!(app.view_mode, ViewMode::Overview | ViewMode::Processes) {
+                app.select_process_row(0);
+            }
+            EventResult::Continue
+        }
+        KeyCode::End => {
+            if app.view_mode == ViewMode::GpuFocus {
+                app.select_gpu_process_last();
+            } else if matches!(app.view_mode, ViewMode::Overview | ViewMode::Processes) {
+                let last = app.rows.len().saturating_sub(1);
+                app.select_process_row(last);
+            }
+            EventResult::Continue
+        }
+        KeyCode::PageUp => {
+            if app.view_mode == ViewMode::GpuFocus {
+                let delta = page_delta(app.gpu_process_body);
+                if delta > 0 {
+                    app.move_gpu_process_selection(-delta);
+                }
+            } else if matches!(app.view_mode, ViewMode::Overview | ViewMode::Processes) {
+                let delta = page_delta(app.process_body);
+                if delta > 0 {
+                    app.move_selection(-delta);
+                }
+            }
+            EventResult::Continue
+        }
+        KeyCode::PageDown => {
+            if app.view_mode == ViewMode::GpuFocus {
+                let delta = page_delta(app.gpu_process_body);
+                if delta > 0 {
+                    app.move_gpu_process_selection(delta);
+                }
+            } else if matches!(app.view_mode, ViewMode::Overview | ViewMode::Processes) {
+                let delta = page_delta(app.process_body);
+                if delta > 0 {
+                    app.move_selection(delta);
+                }
             }
             EventResult::Continue
         }
@@ -85,6 +135,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
         KeyCode::Enter => {
             if app.view_mode == ViewMode::Container {
                 app.enter_container();
+            } else if app.view_mode == ViewMode::GpuFocus {
+                if let Some(pid) = app.selected_gpu_process_pid() {
+                    app.open_confirm_for_pid(pid);
+                } else {
+                    app.open_confirm();
+                }
             } else {
                 app.open_confirm();
             }
@@ -204,15 +260,92 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) -> EventResult {
         return EventResult::Continue;
     }
 
-    if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
-        && let Some(key) = app.sort_key_for_header_click(mouse.column, mouse.row)
-    {
-        if key == app.sort_key {
-            app.toggle_sort_dir();
-        } else {
-            app.set_sort_key(key);
+    match mouse.kind {
+        MouseEventKind::Down(MouseButton::Left) => {
+            if let Some(key) = app.sort_key_for_header_click(mouse.column, mouse.row) {
+                if key == app.sort_key {
+                    app.toggle_sort_dir();
+                } else {
+                    app.set_sort_key(key);
+                }
+                return EventResult::Continue;
+            }
+
+            if let Some(key) = app.gpu_sort_key_for_header_click(mouse.column, mouse.row) {
+                if key == app.gpu_process_sort_key {
+                    app.toggle_gpu_process_sort_dir();
+                } else {
+                    app.set_gpu_process_sort_key(key);
+                }
+                return EventResult::Continue;
+            }
+
+            if let Some(body) = app.process_body
+                && rect_contains(body, mouse.column, mouse.row)
+            {
+                let row_index = (mouse.row - body.y) as usize;
+                let index = app.scroll.saturating_add(row_index);
+                if index < app.rows.len() {
+                    app.select_process_row(index);
+                }
+                return EventResult::Continue;
+            }
+
+            if let Some(body) = app.gpu_process_body
+                && rect_contains(body, mouse.column, mouse.row)
+            {
+                let row_index = (mouse.row - body.y) as usize;
+                let index = app.gpu_process_scroll.saturating_add(row_index);
+                if let Some(pid) = app.gpu_process_order.get(index).copied() {
+                    app.select_process_pid(pid);
+                }
+            }
         }
+        MouseEventKind::ScrollUp => {
+            handle_scroll(app, mouse.column, mouse.row, -1);
+        }
+        MouseEventKind::ScrollDown => {
+            handle_scroll(app, mouse.column, mouse.row, 1);
+        }
+        _ => {}
     }
 
     EventResult::Continue
+}
+
+fn handle_scroll(app: &mut App, column: u16, row: u16, delta: i32) {
+    if app.view_mode == ViewMode::GpuFocus {
+        if let Some(body) = app.gpu_process_body
+            && rect_contains(body, column, row)
+        {
+            app.move_gpu_process_selection(delta);
+        }
+        return;
+    }
+
+    if matches!(app.view_mode, ViewMode::Overview | ViewMode::Processes) {
+        if let Some(body) = app.process_body
+            && rect_contains(body, column, row)
+        {
+            app.move_selection(delta);
+        }
+    }
+}
+
+fn rect_contains(rect: Rect, column: u16, row: u16) -> bool {
+    row >= rect.y
+        && row < rect.y.saturating_add(rect.height)
+        && column >= rect.x
+        && column < rect.x.saturating_add(rect.width)
+}
+
+fn page_delta(body: Option<Rect>) -> i32 {
+    let Some(body) = body else {
+        return 0;
+    };
+    let rows = body.height as usize;
+    if rows == 0 {
+        return 0;
+    }
+    rows.saturating_sub(1).max(1) as i32
 }

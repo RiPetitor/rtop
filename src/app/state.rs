@@ -70,6 +70,39 @@ pub struct HeaderRegion {
     pub rect: Rect,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GpuProcessSortKey {
+    Pid,
+    Kind,
+    Sm,
+    Mem,
+    Enc,
+    Dec,
+    Vram,
+    Name,
+}
+
+impl GpuProcessSortKey {
+    pub fn default_dir(self) -> SortDir {
+        match self {
+            GpuProcessSortKey::Pid | GpuProcessSortKey::Kind | GpuProcessSortKey::Name => {
+                SortDir::Asc
+            }
+            GpuProcessSortKey::Sm
+            | GpuProcessSortKey::Mem
+            | GpuProcessSortKey::Enc
+            | GpuProcessSortKey::Dec
+            | GpuProcessSortKey::Vram => SortDir::Desc,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct GpuProcessHeaderRegion {
+    pub key: GpuProcessSortKey,
+    pub rect: Rect,
+}
+
 #[derive(Default, Clone, Copy)]
 struct ProcessGpuUsage {
     sm_pct: Option<f32>,
@@ -119,7 +152,14 @@ pub struct App {
     pub selected_pid: Option<u32>,
     pub scroll: usize,
     pub tree_labels: HashMap<u32, String>,
+    pub process_body: Option<Rect>,
     pub process_header_regions: Vec<HeaderRegion>,
+    pub gpu_process_header_regions: Vec<GpuProcessHeaderRegion>,
+    pub gpu_process_body: Option<Rect>,
+    pub gpu_process_order: Vec<u32>,
+    pub gpu_process_scroll: usize,
+    pub gpu_process_sort_key: GpuProcessSortKey,
+    pub gpu_process_sort_dir: SortDir,
     pub container_rows: Vec<ContainerRow>,
     pub container_table_state: TableState,
     pub container_selected: Option<ContainerKey>,
@@ -168,7 +208,14 @@ impl App {
             selected_pid: None,
             scroll: 0,
             tree_labels: HashMap::new(),
+            process_body: None,
             process_header_regions: Vec::new(),
+            gpu_process_header_regions: Vec::new(),
+            gpu_process_body: None,
+            gpu_process_order: Vec::new(),
+            gpu_process_scroll: 0,
+            gpu_process_sort_key: GpuProcessSortKey::Sm,
+            gpu_process_sort_dir: GpuProcessSortKey::Sm.default_dir(),
             container_rows: Vec::new(),
             container_table_state: TableState::default(),
             container_selected: None,
@@ -371,6 +418,82 @@ impl App {
         self.selected_pid = Some(self.rows[new_index].pid);
     }
 
+    pub fn move_gpu_process_selection(&mut self, delta: i32) {
+        let len = self.gpu_process_order.len();
+        if len == 0 {
+            return;
+        }
+
+        let current = self
+            .selected_pid
+            .and_then(|pid| {
+                self.gpu_process_order
+                    .iter()
+                    .position(|&entry| entry == pid)
+            })
+            .unwrap_or(0);
+
+        let new_index = if delta < 0 {
+            current.saturating_sub(delta.unsigned_abs() as usize)
+        } else {
+            (current + delta as usize).min(len.saturating_sub(1))
+        };
+
+        self.selected_pid = Some(self.gpu_process_order[new_index]);
+        let max_rows = self
+            .gpu_process_body
+            .map(|rect| rect.height as usize)
+            .unwrap_or(0);
+        if max_rows > 0 {
+            self.ensure_gpu_process_visible(max_rows);
+        }
+    }
+
+    pub fn select_gpu_process_first(&mut self) {
+        if let Some(pid) = self.gpu_process_order.first().copied() {
+            self.selected_pid = Some(pid);
+        }
+        let max_rows = self
+            .gpu_process_body
+            .map(|rect| rect.height as usize)
+            .unwrap_or(0);
+        if max_rows > 0 {
+            self.ensure_gpu_process_visible(max_rows);
+        }
+    }
+
+    pub fn select_gpu_process_last(&mut self) {
+        if let Some(pid) = self.gpu_process_order.last().copied() {
+            self.selected_pid = Some(pid);
+        }
+        let max_rows = self
+            .gpu_process_body
+            .map(|rect| rect.height as usize)
+            .unwrap_or(0);
+        if max_rows > 0 {
+            self.ensure_gpu_process_visible(max_rows);
+        }
+    }
+
+    pub fn select_process_row(&mut self, index: usize) {
+        if self.rows.is_empty() {
+            self.table_state.select(None);
+            self.selected_pid = None;
+            return;
+        }
+
+        let idx = index.min(self.rows.len().saturating_sub(1));
+        self.table_state.select(Some(idx));
+        self.selected_pid = Some(self.rows[idx].pid);
+    }
+
+    pub fn select_process_pid(&mut self, pid: u32) {
+        self.selected_pid = Some(pid);
+        if let Some(index) = self.rows.iter().position(|row| row.pid == pid) {
+            self.table_state.select(Some(index));
+        }
+    }
+
     pub fn selected_row(&self) -> Option<&ProcessRow> {
         self.table_state
             .selected()
@@ -391,6 +514,33 @@ impl App {
         let max_scroll = self.rows.len().saturating_sub(max_rows);
         if self.scroll > max_scroll {
             self.scroll = max_scroll;
+        }
+    }
+
+    pub fn ensure_gpu_process_visible(&mut self, max_rows: usize) {
+        if max_rows == 0 {
+            return;
+        }
+        if self.gpu_process_order.is_empty() {
+            self.gpu_process_scroll = 0;
+            return;
+        }
+
+        if let Some(selected) = self.selected_pid.and_then(|pid| {
+            self.gpu_process_order
+                .iter()
+                .position(|&entry| entry == pid)
+        }) {
+            if selected < self.gpu_process_scroll {
+                self.gpu_process_scroll = selected;
+            } else if selected >= self.gpu_process_scroll + max_rows {
+                self.gpu_process_scroll = selected + 1 - max_rows;
+            }
+        }
+
+        let max_scroll = self.gpu_process_order.len().saturating_sub(max_rows);
+        if self.gpu_process_scroll > max_scroll {
+            self.gpu_process_scroll = max_scroll;
         }
     }
 
@@ -546,6 +696,12 @@ impl App {
 
     pub fn open_confirm(&mut self) {
         if let Some(row) = self.selected_row() {
+            self.open_confirm_for_pid(row.pid);
+        }
+    }
+
+    pub fn open_confirm_for_pid(&mut self, pid: u32) {
+        if let Some(row) = self.rows.iter().find(|row| row.pid == pid) {
             self.confirm = Some(ConfirmKill {
                 pid: row.pid,
                 name: row.name.clone(),
@@ -554,7 +710,26 @@ impl App {
                 status: row.status.clone(),
                 start_time: row.start_time,
             });
+            return;
         }
+
+        let pid = Pid::from_u32(pid);
+        let Some(process) = self.system.process(pid) else {
+            self.set_status(
+                StatusLevel::Warn,
+                format!("Process PID {} not found", pid.as_u32()),
+            );
+            return;
+        };
+
+        self.confirm = Some(ConfirmKill {
+            pid: pid.as_u32(),
+            name: process.name().to_string_lossy().into_owned(),
+            cpu: process.cpu_usage(),
+            mem_bytes: process.memory(),
+            status: format!("{:?}", process.status()),
+            start_time: process.start_time(),
+        });
     }
 
     pub fn cancel_confirm(&mut self) {
@@ -737,6 +912,41 @@ impl App {
                     && column < region.rect.x.saturating_add(region.rect.width)
             })
             .map(|region| region.key)
+    }
+
+    pub fn gpu_sort_key_for_header_click(
+        &self,
+        column: u16,
+        row: u16,
+    ) -> Option<GpuProcessSortKey> {
+        self.gpu_process_header_regions
+            .iter()
+            .find(|region| {
+                row >= region.rect.y
+                    && row < region.rect.y.saturating_add(region.rect.height)
+                    && column >= region.rect.x
+                    && column < region.rect.x.saturating_add(region.rect.width)
+            })
+            .map(|region| region.key)
+    }
+
+    pub fn set_gpu_process_sort_key(&mut self, key: GpuProcessSortKey) {
+        self.gpu_process_sort_key = key;
+        self.gpu_process_sort_dir = key.default_dir();
+    }
+
+    pub fn toggle_gpu_process_sort_dir(&mut self) {
+        self.gpu_process_sort_dir = self.gpu_process_sort_dir.toggle();
+    }
+
+    pub fn selected_gpu_process_pid(&self) -> Option<u32> {
+        let pid = self.selected_pid?;
+        let selected_id = self.selected_gpu().map(|(_, gpu)| gpu.id.as_str())?;
+        let has_pid = self
+            .gpu_processes
+            .iter()
+            .any(|entry| entry.pid == pid && entry.gpu_id == selected_id);
+        has_pid.then_some(pid)
     }
 
     fn clear_expired_status(&mut self) {

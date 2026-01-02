@@ -2,13 +2,13 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use ratatui::prelude::*;
-use ratatui::widgets::{Cell, HighlightSpacing, Paragraph, Row, Table, TableState};
+use ratatui::widgets::{Cell, Paragraph, Row, Table, TableState};
 
 use super::panel_block;
 use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_GOOD, COLOR_MUTED};
-use crate::app::{App, HighlightMode};
-use crate::data::SortKey;
+use crate::app::{App, GpuProcessSortKey, HighlightMode};
+use crate::data::{SortDir, SortKey};
 use crate::utils::{fit_text, format_bytes, format_duration_short};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
@@ -19,6 +19,18 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     } else {
         tr(app.language, "Processes", "Процессы")
     };
+    let block = panel_block(panel_title);
+    let inner = block.inner(process_area);
+    app.process_body = if inner.width > 0 && inner.height > 1 {
+        Some(Rect {
+            x: inner.x,
+            y: inner.y.saturating_add(1),
+            width: inner.width,
+            height: inner.height.saturating_sub(1),
+        })
+    } else {
+        None
+    };
     let name_width = app
         .process_header_regions
         .iter()
@@ -27,7 +39,10 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         .unwrap_or(0)
         .max(1);
 
-    let max_rows = process_area.height.saturating_sub(3) as usize;
+    let max_rows = app
+        .process_body
+        .map(|rect| rect.height as usize)
+        .unwrap_or(0);
     app.ensure_visible(max_rows);
 
     let start = app.scroll.min(app.rows.len());
@@ -96,16 +111,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         ],
     )
     .header(header)
-    .block(panel_block(panel_title))
+    .block(block)
     .column_spacing(1)
     .row_highlight_style(
         Style::default()
             .fg(Color::White)
             .bg(Color::Rgb(40, 48, 58))
             .add_modifier(Modifier::BOLD),
-    )
-    .highlight_symbol("> ")
-    .highlight_spacing(HighlightSpacing::Always);
+    );
 
     let mut state = TableState::default();
     if let Some(selected) = app.table_state.selected()
@@ -122,11 +135,11 @@ fn header_cell(app: &App, key: SortKey, label: &str) -> Cell<'static> {
     let active = app.sort_key == key;
     let indicator = if active {
         match app.sort_dir {
-            crate::data::SortDir::Asc => " ^",
-            crate::data::SortDir::Desc => " v",
+            SortDir::Asc => "^",
+            SortDir::Desc => "v",
         }
     } else {
-        "  "
+        " "
     };
 
     let style = if active {
@@ -142,18 +155,19 @@ fn header_cell(app: &App, key: SortKey, label: &str) -> Cell<'static> {
     Cell::from(format!("{label}{indicator}")).style(style)
 }
 
-pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &App) {
+pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &mut App) {
+    app.gpu_process_order.clear();
+    app.gpu_process_body = None;
+    app.gpu_process_header_regions.clear();
+
     if area.width == 0 || area.height == 0 {
         return;
     }
 
+    let panel_title = tr(app.language, "GPU Processes", "Процессы GPU");
     let Some(selected_id) = app.selected_gpu().map(|(_, gpu)| gpu.id.as_str()) else {
         let paragraph = Paragraph::new(tr(app.language, "No GPU selected", "GPU не выбран"))
-            .block(panel_block(tr(
-                app.language,
-                "GPU Processes",
-                "Процессы GPU",
-            )))
+            .block(panel_block(panel_title))
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);
         return;
@@ -180,31 +194,46 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &App) {
         })
         .collect::<Vec<_>>();
 
-    rows.sort_by(|a, b| {
-        let a_sm = a.sm_pct.unwrap_or(-1.0);
-        let b_sm = b.sm_pct.unwrap_or(-1.0);
-        b_sm.partial_cmp(&a_sm)
-            .unwrap_or(Ordering::Equal)
-            .then_with(|| b.fb_mb.unwrap_or(0).cmp(&a.fb_mb.unwrap_or(0)))
-            .then_with(|| a.pid.cmp(&b.pid))
-    });
-
     if rows.is_empty() {
+        app.gpu_process_scroll = 0;
         let paragraph = Paragraph::new(tr(app.language, "No GPU processes", "Нет процессов GPU"))
-            .block(panel_block(tr(
-                app.language,
-                "GPU Processes",
-                "Процессы GPU",
-            )))
+            .block(panel_block(panel_title))
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);
         return;
     }
 
-    let max_rows = area.height.saturating_sub(3) as usize;
-    let table_rows = rows
+    rows.sort_by(|a, b| sort_gpu_rows(a, b, app.gpu_process_sort_key, app.gpu_process_sort_dir));
+    app.gpu_process_order = rows.iter().map(|row| row.pid).collect();
+
+    let block = panel_block(panel_title);
+    let inner = block.inner(area);
+    if inner.width == 0 || inner.height == 0 {
+        return;
+    }
+
+    app.gpu_process_body = if inner.height > 1 {
+        Some(Rect {
+            x: inner.x,
+            y: inner.y.saturating_add(1),
+            width: inner.width,
+            height: inner.height.saturating_sub(1),
+        })
+    } else {
+        None
+    };
+    update_gpu_process_header_regions(app, area);
+
+    let max_rows = app
+        .gpu_process_body
+        .map(|rect| rect.height as usize)
+        .unwrap_or(0);
+    app.ensure_gpu_process_visible(max_rows);
+    let start = app.gpu_process_scroll.min(rows.len());
+    let end = (start + max_rows).min(rows.len());
+    let visible_rows = if start < end { &rows[start..end] } else { &[] };
+    let table_rows = visible_rows
         .iter()
-        .take(max_rows)
         .map(|row| {
             Row::new(vec![
                 row.pid.to_string(),
@@ -222,13 +251,15 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &App) {
         .collect::<Vec<_>>();
 
     let header = Row::new(vec![
-        "PID", "Type", "SM%", "MEM%", "ENC%", "DEC%", "VRAM", "NAME",
-    ])
-    .style(
-        Style::default()
-            .fg(COLOR_MUTED)
-            .add_modifier(Modifier::BOLD),
-    );
+        gpu_header_cell(app, GpuProcessSortKey::Pid, "PID"),
+        gpu_header_cell(app, GpuProcessSortKey::Kind, "Type"),
+        gpu_header_cell(app, GpuProcessSortKey::Sm, "SM%"),
+        gpu_header_cell(app, GpuProcessSortKey::Mem, "MEM%"),
+        gpu_header_cell(app, GpuProcessSortKey::Enc, "ENC%"),
+        gpu_header_cell(app, GpuProcessSortKey::Dec, "DEC%"),
+        gpu_header_cell(app, GpuProcessSortKey::Vram, "VRAM"),
+        gpu_header_cell(app, GpuProcessSortKey::Name, "NAME"),
+    ]);
 
     let table = Table::new(
         table_rows,
@@ -244,14 +275,119 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &App) {
         ],
     )
     .header(header)
-    .block(panel_block(tr(
-        app.language,
-        "GPU Processes",
-        "Процессы GPU",
-    )))
-    .column_spacing(1);
+    .block(block)
+    .column_spacing(1)
+    .row_highlight_style(
+        Style::default()
+            .fg(Color::White)
+            .bg(Color::Rgb(40, 48, 58))
+            .add_modifier(Modifier::BOLD),
+    );
 
-    frame.render_widget(table, area);
+    let mut state = TableState::default();
+    if let Some(selected_pid) = app.selected_pid
+        && let Some(index) = rows.iter().position(|row| row.pid == selected_pid)
+        && index >= start
+        && index < end
+    {
+        state.select(Some(index - start));
+    }
+
+    frame.render_stateful_widget(table, area, &mut state);
+}
+
+fn gpu_header_cell(app: &App, key: GpuProcessSortKey, label: &str) -> Cell<'static> {
+    let active = app.gpu_process_sort_key == key;
+    let indicator = if active {
+        match app.gpu_process_sort_dir {
+            SortDir::Asc => "^",
+            SortDir::Desc => "v",
+        }
+    } else {
+        " "
+    };
+
+    let style = if active {
+        Style::default()
+            .fg(COLOR_ACCENT)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+            .fg(COLOR_MUTED)
+            .add_modifier(Modifier::BOLD)
+    };
+
+    Cell::from(format!("{label}{indicator}")).style(style)
+}
+
+fn sort_gpu_rows(
+    a: &GpuProcessRow,
+    b: &GpuProcessRow,
+    key: GpuProcessSortKey,
+    dir: SortDir,
+) -> Ordering {
+    let ordering = match key {
+        GpuProcessSortKey::Pid => cmp_u32(a.pid, b.pid, dir),
+        GpuProcessSortKey::Kind => cmp_option_char(a.kind, b.kind, dir),
+        GpuProcessSortKey::Sm => cmp_option_f32(a.sm_pct, b.sm_pct, dir),
+        GpuProcessSortKey::Mem => cmp_option_f32(a.mem_pct, b.mem_pct, dir),
+        GpuProcessSortKey::Enc => cmp_option_f32(a.enc_pct, b.enc_pct, dir),
+        GpuProcessSortKey::Dec => cmp_option_f32(a.dec_pct, b.dec_pct, dir),
+        GpuProcessSortKey::Vram => cmp_option_u64(a.fb_mb, b.fb_mb, dir),
+        GpuProcessSortKey::Name => cmp_str(&a.name, &b.name, dir),
+    };
+
+    ordering.then_with(|| a.pid.cmp(&b.pid))
+}
+
+fn cmp_u32(a: u32, b: u32, dir: SortDir) -> Ordering {
+    match dir {
+        SortDir::Asc => a.cmp(&b),
+        SortDir::Desc => b.cmp(&a),
+    }
+}
+
+fn cmp_str(a: &str, b: &str, dir: SortDir) -> Ordering {
+    match dir {
+        SortDir::Asc => a.cmp(b),
+        SortDir::Desc => b.cmp(a),
+    }
+}
+
+fn cmp_option_char(a: Option<char>, b: Option<char>, dir: SortDir) -> Ordering {
+    match (a, b) {
+        (Some(a), Some(b)) => match dir {
+            SortDir::Asc => a.cmp(&b),
+            SortDir::Desc => b.cmp(&a),
+        },
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+    }
+}
+
+fn cmp_option_u64(a: Option<u64>, b: Option<u64>, dir: SortDir) -> Ordering {
+    match (a, b) {
+        (Some(a), Some(b)) => match dir {
+            SortDir::Asc => a.cmp(&b),
+            SortDir::Desc => b.cmp(&a),
+        },
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+    }
+}
+
+fn cmp_option_f32(a: Option<f32>, b: Option<f32>, dir: SortDir) -> Ordering {
+    match (a, b) {
+        (Some(a), Some(b)) => match dir {
+            SortDir::Asc => a.partial_cmp(&b).unwrap_or(Ordering::Equal),
+            SortDir::Desc => b.partial_cmp(&a).unwrap_or(Ordering::Equal),
+        },
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+    }
 }
 
 fn build_name_map(app: &App) -> HashMap<u32, &str> {
@@ -340,4 +476,63 @@ fn update_process_header_regions(app: &mut App, area: Rect) {
     }
 
     app.process_header_regions = regions;
+}
+
+fn update_gpu_process_header_regions(app: &mut App, area: Rect) {
+    let block = panel_block("GPU Processes");
+    let inner = block.inner(area);
+    if inner.width == 0 || inner.height == 0 {
+        app.gpu_process_header_regions.clear();
+        return;
+    }
+
+    let spacing = 1u16;
+    let constraints = [
+        Constraint::Length(7),
+        Constraint::Length(4),
+        Constraint::Length(6),
+        Constraint::Length(6),
+        Constraint::Length(6),
+        Constraint::Length(6),
+        Constraint::Length(10),
+        Constraint::Min(10),
+    ];
+    let total_spacing = spacing.saturating_mul(constraints.len().saturating_sub(1) as u16);
+    let layout_width = inner.width.saturating_sub(total_spacing);
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(constraints)
+        .split(Rect {
+            x: 0,
+            y: 0,
+            width: layout_width,
+            height: 1,
+        });
+
+    let mut regions = Vec::with_capacity(constraints.len());
+    let mut x = inner.x;
+    for (idx, rect) in layout.iter().enumerate() {
+        let key = match idx {
+            0 => GpuProcessSortKey::Pid,
+            1 => GpuProcessSortKey::Kind,
+            2 => GpuProcessSortKey::Sm,
+            3 => GpuProcessSortKey::Mem,
+            4 => GpuProcessSortKey::Enc,
+            5 => GpuProcessSortKey::Dec,
+            6 => GpuProcessSortKey::Vram,
+            _ => GpuProcessSortKey::Name,
+        };
+        regions.push(crate::app::GpuProcessHeaderRegion {
+            key,
+            rect: Rect {
+                x,
+                y: inner.y,
+                width: rect.width,
+                height: 1,
+            },
+        });
+        x = x.saturating_add(rect.width + spacing);
+    }
+
+    app.gpu_process_header_regions = regions;
 }

@@ -66,6 +66,18 @@ pub fn render(frame: &mut Frame, app: &App) {
                 hint_style,
             ),
         ]),
+        Line::from(vec![
+            Span::styled("Home/End", key_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "top/bottom", "вверх/вниз")),
+                hint_style,
+            ),
+            Span::styled("PgUp/PgDn", key_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "page", "страница")),
+                hint_style,
+            ),
+        ]),
         Line::from(""),
         Line::from(Span::styled(
             tr(app.language, "Sorting", "Сортировка"),

@@ -10,7 +10,7 @@ use crate::app::App;
 use crate::data::gpu::{gpu_vendor_label, short_device_name};
 use crate::utils::{fit_text, format_bytes, percent, render_bar};
 
-pub fn render(frame: &mut Frame, area: Rect, app: &App) {
+pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     if area.width == 0 || area.height == 0 {
         return;
     }

@@ -10,7 +10,6 @@ use crate::app::{App, HighlightMode, ViewMode};
 use crate::utils::{format_bytes, format_duration, percent};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
-    let load = System::load_average();
     let cpu = app.system.global_cpu_usage();
     let total_mem = app.system.total_memory();
     let used_mem = app.system.used_memory();
@@ -99,14 +98,6 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         Line::from(vec![
             Span::styled(tr(app.language, "CPU", "CPU"), label_style),
             Span::styled(format!(" {:>5.1}%  ", cpu), value_style),
-            Span::styled(tr(app.language, "Load", "Нагр."), label_style),
-            Span::styled(
-                format!(
-                    " {:>4.2} {:>4.2} {:>4.2}  ",
-                    load.one, load.five, load.fifteen
-                ),
-                value_style,
-            ),
             Span::styled(tr(app.language, "Uptime", "Аптайм"), label_style),
             Span::styled(format!(" {}", uptime), value_style),
         ]),
