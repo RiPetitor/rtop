@@ -2,7 +2,7 @@
 
 Терминальный монитор системы для Linux с поддержкой GPU.
 
-![Rust](https://img.shields.io/badge/Rust-1.75+-orange?logo=rust)
+![Rust](https://img.shields.io/badge/Rust-1.85+-orange?logo=rust)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux-green)
 
@@ -95,6 +95,7 @@ show_vram = true
 default_sort = "cpu"
 sort_dir = "desc"
 gpu_preference = "auto"
+language = "en"
 ```
 
 CLI‑аргументы имеют приоритет над конфигом.
