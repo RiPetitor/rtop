@@ -1,16 +1,31 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::types::GpuProcessUsage;
 
+const MIN_SAMPLE_INTERVAL: Duration = Duration::from_millis(500);
+
+
 type ProcessKey = (String, u32);
 
-#[derive(Default)]
 pub struct DrmProcessTracker {
     last: HashMap<ProcessKey, DrmProcessCounters>,
     last_instant: Option<Instant>,
+    last_output: Vec<GpuProcessUsage>,
+    min_interval: Duration,
+}
+
+impl Default for DrmProcessTracker {
+    fn default() -> Self {
+        Self {
+            last: HashMap::new(),
+            last_instant: None,
+            last_output: Vec::new(),
+            min_interval: MIN_SAMPLE_INTERVAL,
+        }
+    }
 }
 
 impl DrmProcessTracker {
@@ -20,6 +35,12 @@ impl DrmProcessTracker {
 
     pub fn sample_processes(&mut self) -> Vec<GpuProcessUsage> {
         let now = Instant::now();
+        if let Some(last) = self.last_instant {
+            if now.duration_since(last) < self.min_interval {
+                return self.last_output.clone();
+            }
+        }
+
         let current = collect_drm_process_counters();
         let interval_ns = self
             .last_instant
@@ -54,6 +75,7 @@ impl DrmProcessTracker {
 
         self.last = current;
         self.last_instant = Some(now);
+        self.last_output = outputs.clone();
         outputs
     }
 }

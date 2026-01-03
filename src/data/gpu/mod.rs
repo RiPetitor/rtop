@@ -31,10 +31,14 @@ pub fn probe_gpus_with_tracker(tracker: &mut DrmProcessTracker) -> GpuSnapshot {
     let mut gpus = registry.probe_all();
     normalize_gpu_names(&mut gpus, &pci_names);
     let mut process_sources = Vec::new();
-    if gpus.iter().any(|gpu| gpu.id.starts_with("nvidia:")) {
+    let has_nvidia = gpus.iter().any(|gpu| gpu.id.starts_with("nvidia:"));
+    let needs_drm = gpus.iter().any(|gpu| !gpu.id.starts_with("nvidia:"));
+    if has_nvidia {
         process_sources.push(nvidia::probe_nvidia_processes(Duration::from_millis(800)));
     }
-    process_sources.push(tracker.sample_processes());
+    if needs_drm {
+        process_sources.push(tracker.sample_processes());
+    }
     let processes = merge_process_lists(process_sources);
     GpuSnapshot { gpus, processes }
 }

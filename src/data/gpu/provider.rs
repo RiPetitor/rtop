@@ -98,27 +98,30 @@ impl GpuProviderRegistry {
 
     /// Probe all providers and return merged results
     pub fn probe_all(&self) -> Vec<GpuInfo> {
-        let mut has_nvidia = false;
-
-        // First pass: check if nvidia-smi returns results
-        for provider in &self.providers {
-            if provider.name() == "nvidia-smi" {
-                let gpus = provider.probe(false);
-                if !gpus.is_empty() {
-                    has_nvidia = true;
-                }
-                break;
-            }
-        }
-
         // Collect results from all providers, sorted by priority
         let mut sorted_providers: Vec<_> = self.providers.iter().collect();
         sorted_providers.sort_by_key(|b| std::cmp::Reverse(b.priority()));
 
+        let mut cached_nvidia = None;
+        let mut has_nvidia = false;
+        for provider in &sorted_providers {
+            if provider.name() == "nvidia-smi" {
+                let gpus = provider.probe(false);
+                has_nvidia = !gpus.is_empty();
+                cached_nvidia = Some(gpus);
+                break;
+            }
+        }
+
         let mut all_gpus: Vec<Vec<GpuInfo>> = Vec::new();
         for provider in sorted_providers {
-            let skip = has_nvidia && provider.name() != "nvidia-smi";
-            let gpus = provider.probe(skip);
+            let gpus = if provider.name() == "nvidia-smi" {
+                cached_nvidia
+                    .take()
+                    .unwrap_or_else(|| provider.probe(false))
+            } else {
+                provider.probe(has_nvidia)
+            };
             all_gpus.push(gpus);
         }
 
