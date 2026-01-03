@@ -34,7 +34,6 @@ pub fn render_info(frame: &mut Frame, area: Rect, app: &App) {
 
     let kernel = System::kernel_version().unwrap_or_else(|| unknown.to_string());
     let uptime = format_duration(System::uptime());
-    let load = System::load_average();
     let cpu_brand = app
         .system
         .cpus()
@@ -66,7 +65,6 @@ pub fn render_info(frame: &mut Frame, area: Rect, app: &App) {
     let label_kernel = format!("{:<6}", tr(app.language, "Kernel", "Ядро"));
     let label_arch = format!("{:<6}", tr(app.language, "Arch", "Арх"));
     let label_uptime = format!("{:<6}", tr(app.language, "Uptime", "Аптайм"));
-    let label_load = format!("{:<6}", tr(app.language, "Load", "Нагр."));
     let label_cpu = format!("{:<6}", tr(app.language, "CPU", "CPU"));
     let label_memory = format!("{:<6}", tr(app.language, "Memory", "Память"));
     let label_swap = format!("{:<6}", tr(app.language, "Swap", "Swap"));
@@ -117,14 +115,6 @@ pub fn render_info(frame: &mut Frame, area: Rect, app: &App) {
         &mut lines,
         &label_uptime,
         uptime,
-        width,
-        label_style,
-        value_style,
-    );
-    push_line(
-        &mut lines,
-        &label_load,
-        format!("{:.2} {:.2} {:.2}", load.one, load.five, load.fifteen),
         width,
         label_style,
         value_style,
