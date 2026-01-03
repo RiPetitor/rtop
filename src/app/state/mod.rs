@@ -97,6 +97,32 @@ impl GpuProcessSortKey {
             | GpuProcessSortKey::Vram => SortDir::Desc,
         }
     }
+
+    pub fn next(self) -> Self {
+        match self {
+            GpuProcessSortKey::Pid => GpuProcessSortKey::Kind,
+            GpuProcessSortKey::Kind => GpuProcessSortKey::Sm,
+            GpuProcessSortKey::Sm => GpuProcessSortKey::Mem,
+            GpuProcessSortKey::Mem => GpuProcessSortKey::Enc,
+            GpuProcessSortKey::Enc => GpuProcessSortKey::Dec,
+            GpuProcessSortKey::Dec => GpuProcessSortKey::Vram,
+            GpuProcessSortKey::Vram => GpuProcessSortKey::Name,
+            GpuProcessSortKey::Name => GpuProcessSortKey::Pid,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            GpuProcessSortKey::Pid => GpuProcessSortKey::Name,
+            GpuProcessSortKey::Kind => GpuProcessSortKey::Pid,
+            GpuProcessSortKey::Sm => GpuProcessSortKey::Kind,
+            GpuProcessSortKey::Mem => GpuProcessSortKey::Sm,
+            GpuProcessSortKey::Enc => GpuProcessSortKey::Mem,
+            GpuProcessSortKey::Dec => GpuProcessSortKey::Enc,
+            GpuProcessSortKey::Vram => GpuProcessSortKey::Dec,
+            GpuProcessSortKey::Name => GpuProcessSortKey::Vram,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

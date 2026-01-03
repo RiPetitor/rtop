@@ -121,15 +121,27 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
             EventResult::Continue
         }
         KeyCode::Left => {
-            app.set_sort_key(app.sort_key.prev());
+            if app.view_mode == ViewMode::GpuFocus {
+                app.set_gpu_process_sort_key(app.gpu_process_sort_key.prev());
+            } else {
+                app.set_sort_key(app.sort_key.prev());
+            }
             EventResult::Continue
         }
         KeyCode::Right => {
-            app.set_sort_key(app.sort_key.next());
+            if app.view_mode == ViewMode::GpuFocus {
+                app.set_gpu_process_sort_key(app.gpu_process_sort_key.next());
+            } else {
+                app.set_sort_key(app.sort_key.next());
+            }
             EventResult::Continue
         }
         KeyCode::Char(' ') => {
-            app.toggle_sort_dir();
+            if app.view_mode == ViewMode::GpuFocus {
+                app.toggle_gpu_process_sort_dir();
+            } else {
+                app.toggle_sort_dir();
+            }
             EventResult::Continue
         }
         KeyCode::Enter => {
@@ -139,7 +151,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
                 if let Some(pid) = app.selected_gpu_process_pid() {
                     app.open_confirm_for_pid(pid);
                 } else {
-                    app.open_confirm();
+                    app.set_status(
+                        crate::app::StatusLevel::Warn,
+                        "Select a GPU process first".to_string(),
+                    );
                 }
             } else {
                 app.open_confirm();
