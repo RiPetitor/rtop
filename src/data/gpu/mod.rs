@@ -16,6 +16,8 @@ pub use types::{
 };
 
 use std::collections::HashMap;
+use std::fs;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use crate::utils::text_width;
@@ -30,6 +32,7 @@ pub fn probe_gpus_with_tracker(tracker: &mut DrmProcessTracker) -> GpuSnapshot {
     let registry = GpuProviderRegistry::with_defaults();
     let mut gpus = registry.probe_all();
     normalize_gpu_names(&mut gpus, &pci_names);
+    apply_open_driver_fallback(&mut gpus);
     let mut process_sources = Vec::new();
     let has_nvidia = gpus.iter().any(|gpu| gpu.id.starts_with("nvidia:"));
     let needs_drm = gpus.iter().any(|gpu| !gpu.id.starts_with("nvidia:"));
@@ -78,6 +81,74 @@ fn pci_name_map() -> HashMap<String, PciName> {
 #[cfg(not(all(target_os = "linux", feature = "pci-names")))]
 fn pci_name_map() -> HashMap<String, PciName> {
     HashMap::new()
+}
+
+fn apply_open_driver_fallback(gpus: &mut [GpuInfo]) {
+    let Some(mesa_version) = detect_mesa_version() else {
+        return;
+    };
+
+    for gpu in gpus {
+        let is_nvidia = gpu.id.starts_with("nvidia:")
+            || gpu
+                .vendor
+                .as_deref()
+                .is_some_and(|vendor| vendor.eq_ignore_ascii_case("nvidia"));
+        if is_nvidia {
+            continue;
+        }
+
+        let driver = gpu.driver.as_deref();
+        let is_open_kernel = driver.is_some_and(|driver| {
+            matches!(
+                driver,
+                "amdgpu" | "radeon" | "i915" | "xe" | "nouveau" | "vmwgfx"
+            )
+        });
+
+        if gpu.driver_version.is_none() && (gpu.driver.is_none() || is_open_kernel) {
+            let label = if let Some(driver) = driver {
+                format!("mesa ({driver})")
+            } else {
+                "mesa".to_string()
+            };
+            gpu.driver = Some(label);
+            gpu.driver_version = Some(mesa_version.clone());
+        }
+    }
+}
+
+fn detect_mesa_version() -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        static VERSION: OnceLock<Option<String>> = OnceLock::new();
+        return VERSION
+            .get_or_init(|| {
+                const PATHS: [&str; 6] = [
+                    "/usr/share/mesa/mesa.version",
+                    "/usr/share/mesa/mesa_version",
+                    "/usr/share/mesa/version",
+                    "/usr/lib/mesa/mesa.version",
+                    "/usr/lib/mesa/mesa_version",
+                    "/usr/lib/mesa/version",
+                ];
+                for path in PATHS {
+                    if let Ok(contents) = fs::read_to_string(path) {
+                        let value = contents.trim();
+                        if !value.is_empty() {
+                            return Some(value.to_string());
+                        }
+                    }
+                }
+                None
+            })
+            .clone();
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
 }
 
 pub fn merge_gpu_lists_multi(sources: Vec<Vec<GpuInfo>>) -> Vec<GpuInfo> {

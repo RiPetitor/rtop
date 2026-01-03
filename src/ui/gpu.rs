@@ -115,16 +115,6 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(power_str, value_style),
         ]));
 
-        let driver_label = tr(app.language, "Driver", "Драйвер");
-        let version_label = tr(app.language, "Version", "Версия");
-        let driver = gpu.driver.as_deref().unwrap_or(na_label);
-        let version = gpu.driver_version.as_deref().unwrap_or(na_label);
-        let driver_info = format!("{driver} | {version_label} {version}");
-        let driver_info = fit_text(&driver_info, width.saturating_sub(label_width));
-        lines.push(Line::from(vec![
-            Span::styled(format!("{:<label_width$}", driver_label), label_style),
-            Span::styled(driver_info, value_style),
-        ]));
 
         // Строка 2: VRAM
         if let Some(memory) = gpu.memory.as_ref() {
@@ -164,6 +154,17 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                 Span::styled(format!(" {:>3.0}%", fan_pct), value_style),
             ]));
         }
+
+        let driver_label = tr(app.language, "Driver", "Драйвер");
+        let version_label = tr(app.language, "Version", "Версия");
+        let driver = gpu.driver.as_deref().unwrap_or(na_label);
+        let version = gpu.driver_version.as_deref().unwrap_or(na_label);
+        let driver_info = format!("{driver} | {version_label} {version}");
+        let driver_info = fit_text(&driver_info, width.saturating_sub(label_width));
+        lines.push(Line::from(vec![
+            Span::styled(format!("{:<label_width$}", driver_label), label_style),
+            Span::styled(driver_info, value_style),
+        ]));
     } else {
         lines.push(Line::from(Span::styled(
             fit_text(
