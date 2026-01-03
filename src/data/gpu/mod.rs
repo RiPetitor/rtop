@@ -16,12 +16,11 @@ pub use types::{
 };
 
 use std::collections::HashMap;
-use std::env;
 use std::fs;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use crate::utils::{run_command_with_timeout, text_width};
+use crate::utils::text_width;
 
 pub fn probe_gpus() -> GpuSnapshot {
     let mut tracker = DrmProcessTracker::new();
@@ -125,9 +124,23 @@ fn detect_mesa_version() -> Option<String> {
         static VERSION: OnceLock<Option<String>> = OnceLock::new();
         return VERSION
             .get_or_init(|| {
-                mesa_version_from_paths()
-                    .or_else(mesa_version_from_pkg_config)
-                    .or_else(mesa_version_from_glxinfo)
+                const PATHS: [&str; 6] = [
+                    "/usr/share/mesa/mesa.version",
+                    "/usr/share/mesa/mesa_version",
+                    "/usr/share/mesa/version",
+                    "/usr/lib/mesa/mesa.version",
+                    "/usr/lib/mesa/mesa_version",
+                    "/usr/lib/mesa/version",
+                ];
+                for path in PATHS {
+                    if let Ok(contents) = fs::read_to_string(path) {
+                        let value = contents.trim();
+                        if !value.is_empty() {
+                            return Some(value.to_string());
+                        }
+                    }
+                }
+                None
             })
             .clone();
     }
@@ -135,65 +148,6 @@ fn detect_mesa_version() -> Option<String> {
     #[cfg(not(target_os = "linux"))]
     {
         None
-    }
-}
-
-fn mesa_version_from_paths() -> Option<String> {
-    const PATHS: [&str; 6] = [
-        "/usr/share/mesa/mesa.version",
-        "/usr/share/mesa/mesa_version",
-        "/usr/share/mesa/version",
-        "/usr/lib/mesa/mesa.version",
-        "/usr/lib/mesa/mesa_version",
-        "/usr/lib/mesa/version",
-    ];
-    for path in PATHS {
-        if let Ok(contents) = fs::read_to_string(path) {
-            let value = contents.trim();
-            if !value.is_empty() {
-                return Some(value.to_string());
-            }
-        }
-    }
-    None
-}
-
-fn mesa_version_from_pkg_config() -> Option<String> {
-    let output = run_command_with_timeout(
-        "pkg-config",
-        &["--modversion", "mesa"],
-        Duration::from_millis(400),
-    )?;
-    let token = output.split_whitespace().next()?;
-    sanitize_version_token(token)
-}
-
-fn mesa_version_from_glxinfo() -> Option<String> {
-    if env::var_os("DISPLAY").is_none() {
-        return None;
-    }
-    let output = run_command_with_timeout("glxinfo", &["-B"], Duration::from_millis(800))?;
-    for line in output.lines() {
-        if let Some(version) = extract_mesa_version_from_line(line) {
-            return Some(version);
-        }
-    }
-    None
-}
-
-fn extract_mesa_version_from_line(line: &str) -> Option<String> {
-    let idx = line.find("Mesa")?;
-    let rest = line[idx + "Mesa".len()..].trim_start();
-    let token = rest.split_whitespace().next()?;
-    sanitize_version_token(token)
-}
-
-fn sanitize_version_token(token: &str) -> Option<String> {
-    let trimmed = token.trim_matches(|ch: char| ch == ')' || ch == ',');
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
     }
 }
 
