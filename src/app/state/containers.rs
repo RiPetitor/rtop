@@ -1,5 +1,5 @@
-use std::collections::HashMap;
-use std::time::Instant;
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 use super::{App, NetSampleEntry};
 use crate::data::{
@@ -8,6 +8,8 @@ use crate::data::{
 
 impl App {
     pub fn update_containers(&mut self) {
+        const NET_SAMPLE_INTERVAL: Duration = Duration::from_millis(1000);
+
         #[derive(Default)]
         struct ContainerUsage {
             cpu: f32,
@@ -16,53 +18,78 @@ impl App {
             netns_id: Option<u64>,
         }
 
+        let now = Instant::now();
+        let needs_net_sample = self
+            .container_net_last_sample
+            .map(|prev| now.duration_since(prev) >= NET_SAMPLE_INTERVAL)
+            .unwrap_or(true);
+
         let mut map: HashMap<ContainerKey, ContainerUsage> = HashMap::new();
         let mut pid_map = HashMap::new();
         let mut netns_pids: HashMap<u64, u32> = HashMap::new();
         let mut netns_container_counts: HashMap<u64, usize> = HashMap::new();
+        let mut active_keys: HashSet<ContainerKey> = HashSet::new();
         for (pid, process) in self.system.processes() {
             let pid = pid.as_u32();
             if let Some(key) = container_key_for_pid(pid) {
+                active_keys.insert(key.clone());
                 pid_map.insert(pid, key.clone());
                 let entry = map.entry(key.clone()).or_default();
                 entry.cpu += process.cpu_usage();
                 entry.mem_bytes = entry.mem_bytes.saturating_add(process.memory());
                 entry.proc_count += 1;
-                if entry.netns_id.is_none()
-                    && let Some(netns_id) = netns_id_for_pid(pid)
-                {
-                    entry.netns_id = Some(netns_id);
-                    netns_pids.entry(netns_id).or_insert(pid);
-                    *netns_container_counts.entry(netns_id).or_insert(0) += 1;
+                if entry.netns_id.is_none() {
+                    if let Some(netns_id) = self.container_netns_cache.get(&key).copied() {
+                        entry.netns_id = Some(netns_id);
+                    } else if needs_net_sample {
+                        if let Some(netns_id) = netns_id_for_pid(pid) {
+                            entry.netns_id = Some(netns_id);
+                            self.container_netns_cache.insert(key.clone(), netns_id);
+                        }
+                    }
+                    if let Some(netns_id) = entry.netns_id {
+                        *netns_container_counts.entry(netns_id).or_insert(0) += 1;
+                        if needs_net_sample {
+                            netns_pids.entry(netns_id).or_insert(pid);
+                        }
+                    }
                 }
             }
         }
 
-        let now = Instant::now();
-        let mut net_rates: HashMap<u64, u64> = HashMap::new();
-        let mut next_net_prev: HashMap<u64, NetSampleEntry> = HashMap::new();
-        for (netns_id, pid) in netns_pids {
-            if let Some(sample) = net_sample_for_pid(pid) {
-                if let Some(prev) = self.container_net_prev.get(&netns_id) {
-                    let elapsed = now.duration_since(prev.timestamp).as_secs_f64();
-                    if elapsed > 0.0 {
-                        let rx_delta = sample.rx_bytes.saturating_sub(prev.sample.rx_bytes);
-                        let tx_delta = sample.tx_bytes.saturating_sub(prev.sample.tx_bytes);
-                        let rx_rate = (rx_delta as f64 / elapsed).round() as u64;
-                        let tx_rate = (tx_delta as f64 / elapsed).round() as u64;
-                        net_rates.insert(netns_id, rx_rate.saturating_add(tx_rate));
+        self.container_netns_cache
+            .retain(|key, _| active_keys.contains(key));
+
+        if needs_net_sample {
+            let mut net_rates: HashMap<u64, u64> = HashMap::new();
+            let mut next_net_prev: HashMap<u64, NetSampleEntry> = HashMap::new();
+            for (netns_id, pid) in netns_pids {
+                if let Some(sample) = net_sample_for_pid(pid) {
+                    if let Some(prev) = self.container_net_prev.get(&netns_id) {
+                        let elapsed = now.duration_since(prev.timestamp).as_secs_f64();
+                        if elapsed > 0.0 {
+                            let rx_delta = sample.rx_bytes.saturating_sub(prev.sample.rx_bytes);
+                            let tx_delta = sample.tx_bytes.saturating_sub(prev.sample.tx_bytes);
+                            let rx_rate = (rx_delta as f64 / elapsed).round() as u64;
+                            let tx_rate = (tx_delta as f64 / elapsed).round() as u64;
+                            net_rates.insert(netns_id, rx_rate.saturating_add(tx_rate));
+                        }
                     }
+                    next_net_prev.insert(
+                        netns_id,
+                        NetSampleEntry {
+                            sample,
+                            timestamp: now,
+                        },
+                    );
                 }
-                next_net_prev.insert(
-                    netns_id,
-                    NetSampleEntry {
-                        sample,
-                        timestamp: now,
-                    },
-                );
             }
+            self.container_net_prev = next_net_prev;
+            self.container_net_rates = net_rates;
+            self.container_net_last_sample = Some(now);
         }
-        self.container_net_prev = next_net_prev;
+
+        let net_rates = &self.container_net_rates;
 
         let mut rows = map
             .into_iter()
