@@ -1,6 +1,6 @@
 use ratatui::prelude::*;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_BORDER, COLOR_MUTED};
@@ -11,189 +11,189 @@ pub fn render(frame: &mut Frame, app: &App) {
         return;
     }
 
-    let area = centered_rect(72, 70, frame.area());
+    let area = centered_rect(60, 80, frame.area());
     frame.render_widget(Clear, area);
 
     let key_style = Style::default()
         .fg(COLOR_ACCENT)
         .add_modifier(Modifier::BOLD);
     let label_style = Style::default()
-        .fg(COLOR_MUTED)
+        .fg(Color::White)
         .add_modifier(Modifier::BOLD);
     let hint_style = Style::default().fg(COLOR_MUTED);
 
-    let lines = vec![
-        Line::from(Span::styled(
-            tr(app.language, "Quick Keys", "Быстрые клавиши"),
-            label_style,
-        )),
-        Line::from(vec![
-            Span::styled("F2", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "setup", "настройки")),
-                hint_style,
-            ),
-            Span::styled("F12", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "help", "справка")),
-                hint_style,
-            ),
-            Span::styled("q/й", key_style),
-            Span::styled(
-                format!(" {}", tr(app.language, "quit", "выход")),
-                hint_style,
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            tr(app.language, "Navigation", "Навигация"),
-            label_style,
-        )),
-        Line::from(vec![
-            Span::styled("Up/Down", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "move", "перемещение")),
-                hint_style,
-            ),
-            Span::styled("Enter", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "action", "действие")),
-                hint_style,
-            ),
-            Span::styled("Esc", key_style),
-            Span::styled(
-                format!(" {}", tr(app.language, "back/close", "назад/закрыть")),
-                hint_style,
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("Home/End", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "top/bottom", "вверх/вниз")),
-                hint_style,
-            ),
-            Span::styled("PgUp/PgDn", key_style),
-            Span::styled(
-                format!(" {}", tr(app.language, "page", "страница")),
-                hint_style,
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            tr(app.language, "Sorting", "Сортировка"),
-            label_style,
-        )),
-        Line::from(vec![
-            Span::styled("Left/Right", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "column", "колонка")),
-                hint_style,
-            ),
-            Span::styled("Space", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "order", "порядок")),
-                hint_style,
-            ),
-            Span::styled("Mouse", key_style),
-            Span::styled(
-                format!(
-                    " {}",
-                    tr(app.language, "header sort", "сортировка по заголовку")
-                ),
-                hint_style,
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("c/m/p/n/u (с/ь/з/т/г)", key_style),
-            Span::styled(
-                format!(
-                    " {}  ",
-                    tr(app.language, "quick sort", "быстрая сортировка")
-                ),
-                hint_style,
-            ),
-            Span::styled("h/р", key_style),
-            Span::styled(
-                format!(" {}", tr(app.language, "highlight", "подсветка")),
-                hint_style,
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(tr(app.language, "Tree mode", "Дерево"), label_style),
-            Span::styled(
-                format!(" {}", tr(app.language, "PID order only", "только PID")),
-                hint_style,
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            tr(app.language, "Views", "Режимы"),
-            label_style,
-        )),
-        Line::from(vec![
-            Span::styled("1", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "overview", "обзор")),
-                hint_style,
-            ),
-            Span::styled("2", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "system", "система")),
-                hint_style,
-            ),
-            Span::styled("3", key_style),
-            Span::styled(format!(" {}  ", tr(app.language, "gpu", "gpu")), hint_style),
-            Span::styled("4", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "containers", "контейнеры")),
-                hint_style,
-            ),
-            Span::styled("Tab", key_style),
-            Span::styled(
-                format!(" {}", tr(app.language, "cycle", "цикл")),
-                hint_style,
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("t/е", key_style),
-            Span::styled(
-                format!(
-                    " {}",
-                    tr(app.language, "tree (Processes)", "дерево (Процессы)")
-                ),
-                hint_style,
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(tr(app.language, "GPU", "GPU"), label_style)),
-        Line::from(vec![
-            Span::styled("g/G (п/П)", key_style),
-            Span::styled(
-                format!(" {}", tr(app.language, "select GPU", "выбор GPU")),
-                hint_style,
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            tr(app.language, "Other", "Прочее"),
-            label_style,
-        )),
-        Line::from(vec![
-            Span::styled("r/к", key_style),
-            Span::styled(
-                format!(" {}  ", tr(app.language, "refresh", "обновить")),
-                hint_style,
-            ),
-            Span::styled("b/и", key_style),
-            Span::styled(
-                format!(" {}", tr(app.language, "back", "назад")),
-                hint_style,
-            ),
-        ]),
-    ];
+    // Fixed column widths for alignment
+    let col1 = 14; // Key column
+    let col2 = 24; // Description column
+
+    let mut lines = Vec::new();
+
+    // Section: Quick Keys
+    lines.push(Line::from(Span::styled(
+        tr(app.language, "Quick Keys", "Быстрые клавиши"),
+        label_style,
+    )));
+    lines.push(make_row(
+        "F2",
+        tr(app.language, "Setup", "Настройки"),
+        "F12",
+        tr(app.language, "Help", "Справка"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(make_row(
+        "q/й",
+        tr(app.language, "Quit", "Выход"),
+        "r/к",
+        tr(app.language, "Refresh", "Обновить"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(Line::from(""));
+
+    // Section: Navigation
+    lines.push(Line::from(Span::styled(
+        tr(app.language, "Navigation", "Навигация"),
+        label_style,
+    )));
+    lines.push(make_row(
+        "↑/↓",
+        tr(app.language, "Move selection", "Перемещение"),
+        "Enter",
+        tr(app.language, "Expand/Kill", "Развернуть/Убить"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(make_row(
+        "Home/End",
+        tr(app.language, "First/Last", "Начало/Конец"),
+        "PgUp/PgDn",
+        tr(app.language, "Page up/down", "Страница"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(make_row(
+        "Esc/b/и",
+        tr(app.language, "Back/Close", "Назад/Закрыть"),
+        "Tab",
+        tr(app.language, "Switch panel", "Сменить панель"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(Line::from(""));
+
+    // Section: Sorting
+    lines.push(Line::from(Span::styled(
+        tr(app.language, "Sorting", "Сортировка"),
+        label_style,
+    )));
+    lines.push(make_row(
+        "←/→",
+        tr(app.language, "Change column", "Сменить колонку"),
+        "Space",
+        tr(app.language, "Toggle order", "Изменить порядок"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(make_row(
+        "c/с",
+        tr(app.language, "Sort by CPU", "По CPU"),
+        "m/ь",
+        tr(app.language, "Sort by Memory", "По памяти"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(make_row(
+        "p/з",
+        tr(app.language, "Sort by PID", "По PID"),
+        "n/т",
+        tr(app.language, "Sort by Name", "По имени"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(make_row(
+        "u/г",
+        tr(app.language, "Sort by User", "По юзеру"),
+        "h/р",
+        tr(app.language, "Highlight mode", "Режим подсветки"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(Line::from(""));
+
+    // Section: Views
+    lines.push(Line::from(Span::styled(
+        tr(app.language, "Views", "Режимы"),
+        label_style,
+    )));
+    lines.push(make_row(
+        "1",
+        tr(app.language, "Overview", "Обзор"),
+        "2",
+        tr(app.language, "System Info", "Система"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(make_row(
+        "3",
+        tr(app.language, "GPU", "GPU"),
+        "4",
+        tr(app.language, "Containers", "Контейнеры"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(make_row(
+        "5",
+        tr(app.language, "Processes", "Процессы"),
+        "t/е",
+        tr(app.language, "Tree view", "Дерево"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
+    lines.push(Line::from(""));
+
+    // Section: GPU
+    lines.push(Line::from(Span::styled(
+        tr(app.language, "GPU", "GPU"),
+        label_style,
+    )));
+    lines.push(make_row(
+        "g/п",
+        tr(app.language, "Next GPU", "Следующий GPU"),
+        "G/П",
+        tr(app.language, "Previous GPU", "Предыдущий GPU"),
+        col1,
+        col2,
+        key_style,
+        hint_style,
+    ));
 
     let block = Block::default()
-        .title(tr(app.language, "Help", "Справка"))
+        .title(tr(app.language, " Help ", " Справка "))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(COLOR_BORDER))
         .title_style(
@@ -201,9 +201,31 @@ pub fn render(frame: &mut Frame, app: &App) {
                 .fg(COLOR_ACCENT)
                 .add_modifier(Modifier::BOLD),
         );
-    let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: true });
+    let paragraph = Paragraph::new(lines).block(block);
 
     frame.render_widget(paragraph, area);
+}
+
+fn make_row(
+    key1: &str,
+    desc1: &str,
+    key2: &str,
+    desc2: &str,
+    col1: usize,
+    col2: usize,
+    key_style: Style,
+    hint_style: Style,
+) -> Line<'static> {
+    let key1_padded = format!("{:<width$}", key1, width = col1);
+    let desc1_padded = format!("{:<width$}", desc1, width = col2);
+    let key2_padded = format!("{:<width$}", key2, width = col1);
+
+    Line::from(vec![
+        Span::styled(key1_padded, key_style),
+        Span::styled(desc1_padded, hint_style),
+        Span::styled(key2_padded, key_style),
+        Span::styled(desc2.to_string(), hint_style),
+    ])
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, rect: Rect) -> Rect {
