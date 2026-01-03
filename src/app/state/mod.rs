@@ -16,7 +16,7 @@ use sysinfo::{Pid, System, Uid, Users};
 use super::config::Config;
 use super::highlight::HighlightMode;
 use super::status::{StatusLevel, StatusMessage};
-use super::view_mode::ViewMode;
+use super::view_mode::{GpuFocusPanel, ViewMode};
 use crate::data::gpu::{GpuInfo, GpuPreference, GpuProcessUsage, GpuSnapshot, start_gpu_monitor};
 use crate::data::{ContainerKey, ContainerRow, NetSample, ProcessRow, SortDir, SortKey};
 
@@ -208,6 +208,10 @@ pub struct App {
     gpu_rx: Option<mpsc::Receiver<GpuSnapshot>>,
     pub status: Option<StatusMessage>,
     pub view_mode: ViewMode,
+    pub gpu_focus_panel: GpuFocusPanel,
+    pub gpu_panel_expanded: bool,
+    pub processes_focused: bool,
+    pub processes_expanded: bool,
     pub show_setup: bool,
     pub show_help: bool,
     pub language: Language,
@@ -267,6 +271,10 @@ impl App {
             gpu_rx,
             status: None,
             view_mode: ViewMode::default(),
+            gpu_focus_panel: GpuFocusPanel::default(),
+            gpu_panel_expanded: false,
+            processes_focused: false,
+            processes_expanded: false,
             show_setup: false,
             show_help: false,
             language: config.language,
@@ -335,6 +343,42 @@ impl App {
         self.view_mode = mode;
     }
 
+    pub fn toggle_gpu_focus_panel(&mut self) {
+        if self.view_mode == ViewMode::GpuFocus && !self.gpu_panel_expanded {
+            self.gpu_focus_panel = self.gpu_focus_panel.toggle();
+        }
+    }
+
+    pub fn expand_gpu_panel(&mut self) {
+        if self.view_mode == ViewMode::GpuFocus {
+            self.gpu_panel_expanded = true;
+        }
+    }
+
+    pub fn collapse_gpu_panel(&mut self) {
+        if self.view_mode == ViewMode::GpuFocus && self.gpu_panel_expanded {
+            self.gpu_panel_expanded = false;
+        }
+    }
+
+    pub fn toggle_processes_focus(&mut self) {
+        if self.view_mode == ViewMode::Overview && !self.processes_expanded {
+            self.processes_focused = !self.processes_focused;
+        }
+    }
+
+    pub fn expand_processes(&mut self) {
+        if self.view_mode == ViewMode::Overview && self.processes_focused {
+            self.processes_expanded = true;
+        }
+    }
+
+    pub fn collapse_processes(&mut self) {
+        if self.view_mode == ViewMode::Overview && self.processes_expanded {
+            self.processes_expanded = false;
+        }
+    }
+
     pub fn cycle_view_mode(&mut self) {
         let next = match self.view_mode {
             ViewMode::Overview => ViewMode::Processes,
@@ -351,7 +395,9 @@ impl App {
     }
 
     pub fn toggle_tree_view(&mut self) {
-        if self.view_mode != ViewMode::Processes && self.view_mode != ViewMode::Overview {
+        // Tree view работает в Processes, Overview и при развёрнутых процессах
+        let allowed = self.view_mode == ViewMode::Processes || self.view_mode == ViewMode::Overview;
+        if !allowed {
             return;
         }
         self.tree_view = !self.tree_view;

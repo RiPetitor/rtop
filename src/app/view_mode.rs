@@ -19,3 +19,19 @@ impl ViewMode {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GpuFocusPanel {
+    #[default]
+    Dashboard,
+    Processes,
+}
+
+impl GpuFocusPanel {
+    pub fn toggle(self) -> Self {
+        match self {
+            GpuFocusPanel::Dashboard => GpuFocusPanel::Processes,
+            GpuFocusPanel::Processes => GpuFocusPanel::Dashboard,
+        }
+    }
+}
