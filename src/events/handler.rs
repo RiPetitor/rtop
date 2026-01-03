@@ -14,10 +14,6 @@ pub fn handle_event(app: &mut App, event: AppEvent) -> EventResult {
             app.refresh();
             EventResult::Continue
         }
-        AppEvent::GpuUpdate(snapshot) => {
-            app.apply_gpu_snapshot(snapshot);
-            EventResult::Continue
-        }
         AppEvent::Resize(_, _) => {
             // UI will handle resize automatically
             EventResult::Continue

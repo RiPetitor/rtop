@@ -1,7 +1,5 @@
 use crossterm::event::{KeyEvent, MouseEvent};
 
-use crate::data::gpu::GpuSnapshot;
-
 /// Application events
 #[derive(Debug)]
 pub enum AppEvent {
@@ -11,8 +9,6 @@ pub enum AppEvent {
     Mouse(MouseEvent),
     /// Periodic tick for refresh
     Tick,
-    /// GPU data update from monitor thread
-    GpuUpdate(GpuSnapshot),
     /// Terminal resize
     Resize(u16, u16),
     /// Request to quit
