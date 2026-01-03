@@ -159,8 +159,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
                     app.expand_processes();
                 }
             } else if app.view_mode == ViewMode::GpuFocus {
-                if app.gpu_panel_expanded {
-                    // В развёрнутом режиме - kill процесса
+                use crate::app::GpuFocusPanel;
+                if app.gpu_panel_expanded && app.gpu_focus_panel == GpuFocusPanel::Processes {
+                    // В развёрнутом режиме Processes - kill процесса
                     if let Some(pid) = app.selected_gpu_process_pid() {
                         app.open_confirm_for_pid(pid);
                     } else {
@@ -169,10 +170,11 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
                             "Select a GPU process first".to_string(),
                         );
                     }
-                } else {
+                } else if !app.gpu_panel_expanded {
                     // В обычном режиме - развернуть панель
                     app.expand_gpu_panel();
                 }
+                // В развёрнутом Dashboard - Enter ничего не делает
             } else {
                 app.open_confirm();
             }
