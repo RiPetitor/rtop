@@ -20,8 +20,19 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     } else {
         let enter_label = if app.view_mode == ViewMode::Container {
             tr(app.language, "drill", "внутрь")
+        } else if app.view_mode == ViewMode::Overview && !app.processes_expanded {
+            tr(app.language, "expand", "развернуть")
+        } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
+            tr(app.language, "expand", "развернуть")
         } else {
             tr(app.language, "terminate", "завершить")
+        };
+        let tab_label = if app.view_mode == ViewMode::Overview && !app.processes_expanded {
+            Some(tr(app.language, "select", "выбор"))
+        } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
+            Some(tr(app.language, "panel", "панель"))
+        } else {
+            None
         };
         let mut second_line = vec![
             Span::styled("up/down", key_style),
@@ -41,17 +52,23 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             ),
             Span::styled("enter", key_style),
             Span::styled(format!(" {enter_label}  "), hint_style),
-            Span::styled("t", key_style),
+            Span::styled("t/е", key_style),
             Span::styled(
                 format!(" {}  ", tr(app.language, "tree", "дерево")),
                 hint_style,
             ),
-            Span::styled("tab", key_style),
-            Span::styled(format!(" {}", tr(app.language, "view", "вид")), hint_style),
         ];
-        if app.container_filter.is_some() {
+        if let Some(tab_label) = tab_label {
+            second_line.push(Span::styled("tab", key_style));
+            second_line.push(Span::styled(format!(" {tab_label}"), hint_style));
+        }
+        let show_back = app.container_filter.is_some()
+            || app.view_mode != ViewMode::Overview
+            || (app.view_mode == ViewMode::Overview && app.processes_expanded)
+            || (app.view_mode == ViewMode::GpuFocus && app.gpu_panel_expanded);
+        if show_back {
             second_line.push(Span::styled("  ", hint_style));
-            second_line.push(Span::styled("b/esc", key_style));
+            second_line.push(Span::styled("esc", key_style));
             second_line.push(Span::styled(
                 format!(" {}", tr(app.language, "back", "назад")),
                 hint_style,
@@ -59,12 +76,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         }
         vec![
             Line::from(vec![
-                Span::styled("q", key_style),
+                Span::styled("q/й", key_style),
                 Span::styled(
                     format!(" {}  ", tr(app.language, "quit", "выход")),
                     hint_style,
                 ),
-                Span::styled("r", key_style),
+                Span::styled("r/к", key_style),
                 Span::styled(
                     format!(" {}  ", tr(app.language, "refresh", "обновить")),
                     hint_style,

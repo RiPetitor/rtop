@@ -38,7 +38,7 @@ pub fn render(frame: &mut Frame, app: &App) {
                 format!(" {}  ", tr(app.language, "help", "справка")),
                 hint_style,
             ),
-            Span::styled("q", key_style),
+            Span::styled("q/й", key_style),
             Span::styled(
                 format!(" {}", tr(app.language, "quit", "выход")),
                 hint_style,
@@ -104,7 +104,7 @@ pub fn render(frame: &mut Frame, app: &App) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("c/m/p/n/u", key_style),
+            Span::styled("c/m/p/n/u (с/ь/з/т/г)", key_style),
             Span::styled(
                 format!(
                     " {}  ",
@@ -112,7 +112,7 @@ pub fn render(frame: &mut Frame, app: &App) {
                 ),
                 hint_style,
             ),
-            Span::styled("h", key_style),
+            Span::styled("h/р", key_style),
             Span::styled(
                 format!(" {}", tr(app.language, "highlight", "подсветка")),
                 hint_style,
@@ -155,7 +155,7 @@ pub fn render(frame: &mut Frame, app: &App) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("t", key_style),
+            Span::styled("t/е", key_style),
             Span::styled(
                 format!(
                     " {}",
@@ -167,9 +167,26 @@ pub fn render(frame: &mut Frame, app: &App) {
         Line::from(""),
         Line::from(Span::styled(tr(app.language, "GPU", "GPU"), label_style)),
         Line::from(vec![
-            Span::styled("g/G", key_style),
+            Span::styled("g/G (п/П)", key_style),
             Span::styled(
                 format!(" {}", tr(app.language, "select GPU", "выбор GPU")),
+                hint_style,
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            tr(app.language, "Other", "Прочее"),
+            label_style,
+        )),
+        Line::from(vec![
+            Span::styled("r/к", key_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "refresh", "обновить")),
+                hint_style,
+            ),
+            Span::styled("b/и", key_style),
+            Span::styled(
+                format!(" {}", tr(app.language, "back", "назад")),
                 hint_style,
             ),
         ]),
