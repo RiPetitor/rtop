@@ -36,7 +36,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
 
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
-        KeyCode::Char('q') => EventResult::Exit,
+        KeyCode::Char('с') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
+        KeyCode::Char('q') | KeyCode::Char('й') => EventResult::Exit,
         KeyCode::F(2) => {
             app.toggle_setup();
             EventResult::Continue
@@ -110,9 +111,15 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
             }
             EventResult::Continue
         }
-        KeyCode::Esc | KeyCode::Char('b') => {
+        KeyCode::Esc | KeyCode::Char('b') | KeyCode::Char('и') => {
             if app.container_filter.is_some() {
                 app.exit_container_drill();
+            } else if app.view_mode == ViewMode::Overview && app.processes_expanded {
+                app.collapse_processes();
+            } else if app.view_mode == ViewMode::GpuFocus && app.gpu_panel_expanded {
+                app.collapse_gpu_panel();
+            } else if app.view_mode != ViewMode::Overview {
+                app.set_view_mode(ViewMode::Overview);
             }
             EventResult::Continue
         }
@@ -143,53 +150,67 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
         KeyCode::Enter => {
             if app.view_mode == ViewMode::Container {
                 app.enter_container();
-            } else if app.view_mode == ViewMode::GpuFocus {
-                if let Some(pid) = app.selected_gpu_process_pid() {
-                    app.open_confirm_for_pid(pid);
+            } else if app.view_mode == ViewMode::Overview {
+                if app.processes_expanded {
+                    // В развёрнутом режиме - kill процесса
+                    app.open_confirm();
                 } else {
-                    app.set_status(
-                        crate::app::StatusLevel::Warn,
-                        "Select a GPU process first".to_string(),
-                    );
+                    // В обычном режиме - развернуть Processes
+                    app.expand_processes();
+                }
+            } else if app.view_mode == ViewMode::GpuFocus {
+                if app.gpu_panel_expanded {
+                    // В развёрнутом режиме - kill процесса
+                    if let Some(pid) = app.selected_gpu_process_pid() {
+                        app.open_confirm_for_pid(pid);
+                    } else {
+                        app.set_status(
+                            crate::app::StatusLevel::Warn,
+                            "Select a GPU process first".to_string(),
+                        );
+                    }
+                } else {
+                    // В обычном режиме - развернуть панель
+                    app.expand_gpu_panel();
                 }
             } else {
                 app.open_confirm();
             }
             EventResult::Continue
         }
-        KeyCode::Char('c') => {
+        KeyCode::Char('c') | KeyCode::Char('с') => {
             app.set_sort_key(SortKey::Cpu);
             EventResult::Continue
         }
-        KeyCode::Char('m') => {
+        KeyCode::Char('m') | KeyCode::Char('ь') => {
             app.set_sort_key(SortKey::Mem);
             EventResult::Continue
         }
-        KeyCode::Char('p') => {
+        KeyCode::Char('p') | KeyCode::Char('з') => {
             app.set_sort_key(SortKey::Pid);
             EventResult::Continue
         }
-        KeyCode::Char('u') => {
+        KeyCode::Char('u') | KeyCode::Char('г') => {
             app.set_sort_key(SortKey::User);
             EventResult::Continue
         }
-        KeyCode::Char('h') => {
+        KeyCode::Char('h') | KeyCode::Char('р') => {
             app.cycle_highlight_mode();
             EventResult::Continue
         }
-        KeyCode::Char('n') => {
+        KeyCode::Char('n') | KeyCode::Char('т') => {
             app.set_sort_key(SortKey::Name);
             EventResult::Continue
         }
-        KeyCode::Char('r') => {
+        KeyCode::Char('r') | KeyCode::Char('к') => {
             app.refresh();
             EventResult::Continue
         }
-        KeyCode::Char('g') => {
+        KeyCode::Char('g') | KeyCode::Char('п') => {
             app.select_next_gpu();
             EventResult::Continue
         }
-        KeyCode::Char('t') => {
+        KeyCode::Char('t') | KeyCode::Char('е') => {
             app.toggle_tree_view();
             EventResult::Continue
         }
@@ -214,10 +235,24 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
             EventResult::Continue
         }
         KeyCode::Tab => {
-            app.cycle_view_mode();
+            // Tab переключает панели внутри текущей вкладки
+            if app.view_mode == ViewMode::Overview && !app.processes_expanded {
+                app.toggle_processes_focus();
+            } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
+                app.toggle_gpu_focus_panel();
+            }
+            // Переключение вкладок - только цифрами (1-5)
             EventResult::Continue
         }
-        KeyCode::Char('G') => {
+        KeyCode::BackTab => {
+            if app.view_mode == ViewMode::Overview && !app.processes_expanded {
+                app.toggle_processes_focus();
+            } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
+                app.toggle_gpu_focus_panel();
+            }
+            EventResult::Continue
+        }
+        KeyCode::Char('G') | KeyCode::Char('П') => {
             app.select_prev_gpu();
             EventResult::Continue
         }
@@ -228,11 +263,16 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
 fn handle_confirm_key(app: &mut App, key: KeyEvent) -> EventResult {
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
-        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('q') => {
+        KeyCode::Char('с') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
+        KeyCode::Esc
+        | KeyCode::Char('n')
+        | KeyCode::Char('т')
+        | KeyCode::Char('q')
+        | KeyCode::Char('й') => {
             app.cancel_confirm();
             EventResult::Continue
         }
-        KeyCode::Enter | KeyCode::Char('y') => {
+        KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('н') => {
             app.confirm_kill();
             EventResult::Continue
         }
@@ -243,7 +283,8 @@ fn handle_confirm_key(app: &mut App, key: KeyEvent) -> EventResult {
 fn handle_setup_key(app: &mut App, key: KeyEvent) -> EventResult {
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
-        KeyCode::Esc | KeyCode::F(2) | KeyCode::Char('q') => {
+        KeyCode::Char('с') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
+        KeyCode::Esc | KeyCode::F(2) | KeyCode::Char('q') | KeyCode::Char('й') => {
             app.toggle_setup();
             EventResult::Continue
         }
@@ -258,7 +299,8 @@ fn handle_setup_key(app: &mut App, key: KeyEvent) -> EventResult {
 fn handle_help_key(app: &mut App, key: KeyEvent) -> EventResult {
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
-        KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') => {
+        KeyCode::Char('с') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
+        KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') | KeyCode::Char('й') => {
             app.toggle_help();
             EventResult::Continue
         }
