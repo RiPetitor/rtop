@@ -1,71 +1,4 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ContainerRuntime {
-    Docker,
-    Podman,
-    Containerd,
-    Crio,
-    Kubernetes,
-}
-
-impl ContainerRuntime {
-    pub fn label(self) -> &'static str {
-        match self {
-            ContainerRuntime::Docker => "docker",
-            ContainerRuntime::Podman => "podman",
-            ContainerRuntime::Containerd => "containerd",
-            ContainerRuntime::Crio => "crio",
-            ContainerRuntime::Kubernetes => "k8s",
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ContainerKey {
-    pub runtime: ContainerRuntime,
-    pub id: String,
-}
-
-impl ContainerKey {
-    pub fn label(&self) -> String {
-        format!("{}:{}", self.runtime.label(), short_id(&self.id))
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ContainerRow {
-    pub key: ContainerKey,
-    pub label: String,
-    pub cpu: f32,
-    pub mem_bytes: u64,
-    pub proc_count: usize,
-    pub net_bytes_per_sec: Option<u64>,
-}
-
-impl ContainerRow {
-    pub fn new(
-        key: ContainerKey,
-        cpu: f32,
-        mem_bytes: u64,
-        proc_count: usize,
-        net_bytes_per_sec: Option<u64>,
-    ) -> Self {
-        let label = key.label();
-        Self {
-            key,
-            label,
-            cpu,
-            mem_bytes,
-            proc_count,
-            net_bytes_per_sec,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct NetSample {
-    pub rx_bytes: u64,
-    pub tx_bytes: u64,
-}
+use super::types::{ContainerKey, ContainerRuntime};
 
 pub fn container_key_for_pid(pid: u32) -> Option<ContainerKey> {
     #[cfg(target_os = "linux")]
@@ -73,36 +6,6 @@ pub fn container_key_for_pid(pid: u32) -> Option<ContainerKey> {
         let path = format!("/proc/{pid}/cgroup");
         let contents = std::fs::read_to_string(path).ok()?;
         parse_cgroup(&contents)
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = pid;
-        None
-    }
-}
-
-pub fn netns_id_for_pid(pid: u32) -> Option<u64> {
-    #[cfg(target_os = "linux")]
-    {
-        let path = format!("/proc/{pid}/ns/net");
-        let target = std::fs::read_link(path).ok()?;
-        parse_netns_target(&target.to_string_lossy())
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = pid;
-        None
-    }
-}
-
-pub fn net_sample_for_pid(pid: u32) -> Option<NetSample> {
-    #[cfg(target_os = "linux")]
-    {
-        let path = format!("/proc/{pid}/net/dev");
-        let contents = std::fs::read_to_string(path).ok()?;
-        parse_net_dev(&contents)
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -121,42 +24,6 @@ fn parse_cgroup(contents: &str) -> Option<ContainerKey> {
         }
     }
     None
-}
-
-fn parse_netns_target(value: &str) -> Option<u64> {
-    let start = value.find('[')? + 1;
-    let end = value[start..].find(']')? + start;
-    value[start..end].parse::<u64>().ok()
-}
-
-fn parse_net_dev(contents: &str) -> Option<NetSample> {
-    let mut sample = NetSample::default();
-    let mut found = false;
-    for line in contents.lines().skip(2) {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        let mut parts = line.splitn(2, ':');
-        let iface = parts.next().map(str::trim)?;
-        let rest = parts.next()?.split_whitespace().collect::<Vec<_>>();
-        if rest.len() < 9 {
-            continue;
-        }
-        if iface.is_empty() {
-            continue;
-        }
-        let Ok(rx_bytes) = rest[0].parse::<u64>() else {
-            continue;
-        };
-        let Ok(tx_bytes) = rest[8].parse::<u64>() else {
-            continue;
-        };
-        sample.rx_bytes = sample.rx_bytes.saturating_add(rx_bytes);
-        sample.tx_bytes = sample.tx_bytes.saturating_add(tx_bytes);
-        found = true;
-    }
-    if found { Some(sample) } else { None }
 }
 
 fn parse_cgroup_path(path: &str) -> Option<ContainerKey> {
@@ -296,10 +163,6 @@ fn pod_segment(segment: &str) -> Option<String> {
     Some(format!("pod{rest}"))
 }
 
-fn short_id(value: &str) -> String {
-    value.chars().take(12).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342,23 +205,5 @@ mod tests {
         let key = parse_cgroup(input).unwrap();
         assert_eq!(key.runtime, ContainerRuntime::Kubernetes);
         assert_eq!(key.id, "cccccccccccccccc");
-    }
-
-    #[test]
-    fn parse_netns_target_reads_inode() {
-        let input = "net:[4026531993]";
-        assert_eq!(parse_netns_target(input), Some(4026531993));
-    }
-
-    #[test]
-    fn parse_net_dev_sums_rx_tx() {
-        let input = "\
-Inter-|   Receive                                                |  Transmit\n\
- face |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed\n\
-  eth0: 1024 0 0 0 0 0 0 0 2048 0 0 0 0 0 0 0\n\
-    lo: 512 0 0 0 0 0 0 0 1024 0 0 0 0 0 0 0\n";
-        let sample = parse_net_dev(input).unwrap();
-        assert_eq!(sample.rx_bytes, 1536);
-        assert_eq!(sample.tx_bytes, 3072);
     }
 }
