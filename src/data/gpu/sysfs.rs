@@ -19,6 +19,7 @@ pub fn probe_sysfs_gpus(skip_nvidia: bool) -> Vec<GpuInfo> {
         let vendor_id = read_hex(device_path.join("vendor"));
         let device_id = read_hex(device_path.join("device"));
         let driver = read_link_basename(device_path.join("driver"));
+        let driver_version = driver.as_deref().and_then(read_driver_version);
         let vendor = vendor_name_from_id(vendor_id, driver.as_deref());
         let device = device_id.map(|id| format!("{:04x}", id));
         if skip_nvidia && vendor.eq_ignore_ascii_case("NVIDIA") {
@@ -46,6 +47,8 @@ pub fn probe_sysfs_gpus(skip_nvidia: bool) -> Vec<GpuInfo> {
             name: display,
             vendor: Some(vendor),
             device,
+            driver,
+            driver_version,
             kind,
             memory,
             telemetry,
@@ -63,6 +66,21 @@ fn read_hex<P: AsRef<Path>>(path: P) -> Option<u32> {
 fn read_u64<P: AsRef<Path>>(path: P) -> Option<u64> {
     let raw = fs::read_to_string(path).ok()?;
     raw.trim().parse::<u64>().ok()
+}
+
+fn read_trimmed<P: AsRef<Path>>(path: P) -> Option<String> {
+    let raw = fs::read_to_string(path).ok()?;
+    let value = raw.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
+fn read_driver_version(driver: &str) -> Option<String> {
+    let base = Path::new("/sys/module").join(driver);
+    read_trimmed(base.join("version")).or_else(|| read_trimmed(base.join("srcversion")))
 }
 
 fn read_sysfs_vram(device_path: &Path) -> Option<GpuMemory> {

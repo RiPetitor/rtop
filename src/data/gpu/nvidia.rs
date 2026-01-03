@@ -4,10 +4,10 @@ use std::time::Duration;
 use super::types::{GpuInfo, GpuKind, GpuMemory, GpuProcessUsage, GpuTelemetry};
 use crate::utils::{mib_to_bytes, run_command_with_timeout};
 
-const NVIDIA_QUERY_BASE: &str = "index,name,memory.used,memory.total";
+const NVIDIA_QUERY_BASE: &str = "index,name,memory.used,memory.total,driver_version";
 const NVIDIA_QUERY_EXTENDED: &str = concat!(
     "index,name,memory.used,memory.total,utilization.gpu,utilization.memory,temperature.gpu,",
-    "power.draw,power.limit,fan.speed,encoder.stats.average,decoder.stats.average"
+    "power.draw,power.limit,fan.speed,encoder.stats.average,decoder.stats.average,driver_version"
 );
 const NVIDIA_QUERY_UUID: &str = "index,uuid";
 const NVIDIA_QUERY_COMPUTE_APPS: &str = "gpu_uuid,pid,used_memory";
@@ -96,10 +96,16 @@ fn parse_nvidia_smi_output(output: &str) -> Option<Vec<GpuInfo>> {
             unexpected_format = true;
             continue;
         }
-        if field_count != 4 && field_count < 12 {
+        if field_count != 4 && field_count != 5 && field_count < 12 {
             unexpected_format = true;
             continue;
         }
+
+        let driver_version = match field_count {
+            5 => parse_optional_string(parts[4]),
+            count if count >= 13 => parse_optional_string(parts[12]),
+            _ => None,
+        };
 
         let index = match parts[0].parse::<u32>().ok() {
             Some(value) => value,
@@ -135,6 +141,8 @@ fn parse_nvidia_smi_output(output: &str) -> Option<Vec<GpuInfo>> {
             name: name.clone(),
             vendor: Some("NVIDIA".to_string()),
             device: Some(name),
+            driver: Some("nvidia".to_string()),
+            driver_version,
             kind: GpuKind::Discrete,
             memory: Some(GpuMemory {
                 used_bytes: mib_to_bytes(used),
@@ -257,6 +265,15 @@ fn parse_nvidia_compute_apps_output(output: &str) -> Vec<ComputeAppEntry> {
             })
         })
         .collect()
+}
+
+fn parse_optional_string(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed == "-" || trimmed.eq_ignore_ascii_case("n/a") {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 fn parse_optional_f32(value: &str) -> Option<f32> {

@@ -158,6 +158,12 @@ fn merge_gpu_info(current: &mut GpuInfo, incoming: &GpuInfo) {
     if current.device.is_none() && incoming.device.is_some() {
         current.device.clone_from(&incoming.device);
     }
+    if current.driver.is_none() && incoming.driver.is_some() {
+        current.driver.clone_from(&incoming.driver);
+    }
+    if current.driver_version.is_none() && incoming.driver_version.is_some() {
+        current.driver_version.clone_from(&incoming.driver_version);
+    }
     if text_width(&incoming.name) > text_width(&current.name) {
         current.name.clone_from(&incoming.name);
     }
@@ -322,6 +328,8 @@ mod tests {
                 name: "Intel UHD".to_string(),
                 vendor: Some("Intel".to_string()),
                 device: Some("UHD".to_string()),
+                driver: None,
+                driver_version: None,
                 kind: GpuKind::Integrated,
                 memory: None,
                 telemetry: GpuTelemetry::default(),
@@ -331,6 +339,8 @@ mod tests {
                 name: "RTX".to_string(),
                 vendor: Some("NVIDIA".to_string()),
                 device: Some("RTX".to_string()),
+                driver: None,
+                driver_version: None,
                 kind: GpuKind::Discrete,
                 memory: None,
                 telemetry: GpuTelemetry::default(),

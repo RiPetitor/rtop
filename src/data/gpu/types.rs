@@ -70,6 +70,8 @@ pub struct GpuInfo {
     pub name: String,
     pub vendor: Option<String>,
     pub device: Option<String>,
+    pub driver: Option<String>,
+    pub driver_version: Option<String>,
     pub kind: GpuKind,
     pub memory: Option<GpuMemory>,
     pub telemetry: GpuTelemetry,
