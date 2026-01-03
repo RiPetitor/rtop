@@ -225,7 +225,9 @@ pub fn save_language_preference(language: Language) -> Result<(), String> {
         match fs::read_to_string(&path) {
             Ok(content) => content
                 .parse::<toml::Value>()
-                .unwrap_or_else(|_| toml::Value::Table(Default::default())),
+                .map_err(|err| {
+                    format!("Failed to parse config file {}: {err}", path.display())
+                })?,
             Err(err) => {
                 return Err(format!(
                     "Failed to read config file {}: {err}",
@@ -237,17 +239,15 @@ pub fn save_language_preference(language: Language) -> Result<(), String> {
         toml::Value::Table(Default::default())
     };
 
-    if !root.is_table() {
-        root = toml::Value::Table(Default::default());
-    }
-    let table = root.as_table_mut().expect("table ensured");
+    let table = root
+        .as_table_mut()
+        .ok_or_else(|| format!("Config file {} has invalid format", path.display()))?;
     let display = table
         .entry("display".to_string())
         .or_insert_with(|| toml::Value::Table(Default::default()));
-    if !display.is_table() {
-        *display = toml::Value::Table(Default::default());
-    }
-    let display_table = display.as_table_mut().expect("table ensured");
+    let display_table = display
+        .as_table_mut()
+        .ok_or_else(|| format!("Config file {} has invalid [display] section", path.display()))?;
     display_table.insert(
         "language".to_string(),
         toml::Value::String(language.code().to_string()),
