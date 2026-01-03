@@ -4,14 +4,23 @@ use std::collections::HashMap;
 use ratatui::prelude::*;
 use ratatui::widgets::{Cell, Paragraph, Row, Table, TableState};
 
-use super::super::panel_block;
 use super::super::text::tr;
 use super::super::theme::{COLOR_ACCENT, COLOR_MUTED};
+use super::super::{panel_block, panel_block_focused};
 use crate::app::{App, GpuProcessSortKey};
 use crate::data::SortDir;
 use crate::utils::format_bytes;
 
-pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &mut App) {
+pub fn render_gpu_processes_with_focus(
+    frame: &mut Frame,
+    area: Rect,
+    app: &mut App,
+    focused: bool,
+) {
+    render_gpu_processes_inner(frame, area, app, focused);
+}
+
+fn render_gpu_processes_inner(frame: &mut Frame, area: Rect, app: &mut App, focused: bool) {
     app.gpu_process_order.clear();
     app.gpu_process_body = None;
     app.gpu_process_header_regions.clear();
@@ -21,9 +30,14 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &mut App) {
     }
 
     let panel_title = tr(app.language, "GPU Processes", "Процессы GPU");
+    let block_fn = if focused {
+        panel_block_focused
+    } else {
+        panel_block
+    };
     let Some(selected_id) = app.selected_gpu().map(|(_, gpu)| gpu.id.as_str()) else {
         let paragraph = Paragraph::new(tr(app.language, "No GPU selected", "GPU не выбран"))
-            .block(panel_block(panel_title))
+            .block(block_fn(panel_title))
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);
         return;
@@ -53,7 +67,7 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &mut App) {
     if rows.is_empty() {
         app.gpu_process_scroll = 0;
         let paragraph = Paragraph::new(tr(app.language, "No GPU processes", "Нет процессов GPU"))
-            .block(panel_block(panel_title))
+            .block(block_fn(panel_title))
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);
         return;
@@ -62,7 +76,7 @@ pub fn render_gpu_processes(frame: &mut Frame, area: Rect, app: &mut App) {
     rows.sort_by(|a, b| sort_gpu_rows(a, b, app.gpu_process_sort_key, app.gpu_process_sort_dir));
     app.gpu_process_order = rows.iter().map(|row| row.pid).collect();
 
-    let block = panel_block(panel_title);
+    let block = block_fn(panel_title);
     let inner = block.inner(area);
     if inner.width == 0 || inner.height == 0 {
         return;

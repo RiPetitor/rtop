@@ -60,9 +60,44 @@ pub fn panel_block(title: &str) -> Block<'_> {
         )
 }
 
+pub fn panel_block_focused(title: &str) -> Block<'_> {
+    Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(Style::default().fg(theme::COLOR_ACCENT))
+        .title_style(
+            Style::default()
+                .fg(theme::COLOR_ACCENT)
+                .add_modifier(Modifier::BOLD),
+        )
+}
+
 fn render_overview(frame: &mut Frame, app: &mut App, size: Rect) {
     let header_height = 5;
     let footer_height = 4;
+
+    // Если Processes развёрнут - показать только его
+    if app.processes_expanded {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(header_height),
+                Constraint::Min(8),
+                Constraint::Length(footer_height),
+            ])
+            .split(size);
+
+        header::render(frame, chunks[0], app);
+        processes::render_with_focus(frame, chunks[1], app, true);
+        footer::render(frame, chunks[2], app);
+        confirm::render(frame, app);
+        help::render(frame, app);
+        setup::render(frame, app);
+        return;
+    }
+
+    // Обычный режим
     let min_process_height = 8;
     let available = size
         .height
@@ -80,8 +115,8 @@ fn render_overview(frame: &mut Frame, app: &mut App, size: Rect) {
         .split(size);
 
     header::render(frame, chunks[0], app);
-    stats::render(frame, chunks[1], app);
-    processes::render(frame, chunks[2], app);
+    stats::render_with_focus(frame, chunks[1], app, false);
+    processes::render_with_focus(frame, chunks[2], app, app.processes_focused);
     footer::render(frame, chunks[3], app);
     confirm::render(frame, app);
     help::render(frame, app);

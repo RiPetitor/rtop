@@ -2,19 +2,37 @@ use ratatui::prelude::*;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-use super::panel_block;
 use super::processes;
 use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_MUTED, color_for_percent};
-use crate::app::App;
+use super::{panel_block, panel_block_focused};
+use crate::app::{App, GpuFocusPanel};
 use crate::data::gpu::{gpu_vendor_label, short_device_name};
 use crate::utils::{fit_text, format_bytes, percent, render_bar};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
+    render_inner(frame, area, app, false);
+}
+
+fn render_inner(frame: &mut Frame, area: Rect, app: &mut App, _focused: bool) {
     if area.width == 0 || area.height == 0 {
         return;
     }
 
+    // Если панель развёрнута - показать только её
+    if app.gpu_panel_expanded {
+        match app.gpu_focus_panel {
+            GpuFocusPanel::Dashboard => {
+                render_dashboard(frame, area, app, true);
+            }
+            GpuFocusPanel::Processes => {
+                processes::render_gpu_processes_with_focus(frame, area, app, true);
+            }
+        }
+        return;
+    }
+
+    // Обычный режим - обе панели
     const MIN_DETAIL_HEIGHT: u16 = 7;
     const MIN_TABLE_HEIGHT: u16 = 6;
 
@@ -31,14 +49,22 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         .constraints([Constraint::Length(detail_height), Constraint::Min(0)])
         .split(area);
 
-    render_dashboard(frame, chunks[0], app);
+    let dashboard_focused = app.gpu_focus_panel == GpuFocusPanel::Dashboard;
+    let processes_focused = app.gpu_focus_panel == GpuFocusPanel::Processes;
+
+    render_dashboard(frame, chunks[0], app, dashboard_focused);
     if chunks[1].height > 0 {
-        processes::render_gpu_processes(frame, chunks[1], app);
+        processes::render_gpu_processes_with_focus(frame, chunks[1], app, processes_focused);
     }
 }
 
-fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
-    let block = panel_block(tr(app.language, "GPU Dashboard", "Панель GPU"));
+fn render_dashboard(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
+    let title = tr(app.language, "GPU Dashboard", "Панель GPU");
+    let block = if focused {
+        panel_block_focused(title)
+    } else {
+        panel_block(title)
+    };
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -115,17 +141,6 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(power_str, value_style),
         ]));
 
-        let driver_label = tr(app.language, "Driver", "Драйвер");
-        let version_label = tr(app.language, "Version", "Версия");
-        let driver = gpu.driver.as_deref().unwrap_or(na_label);
-        let version = gpu.driver_version.as_deref().unwrap_or(na_label);
-        let driver_info = format!("{driver} | {version_label} {version}");
-        let driver_info = fit_text(&driver_info, width.saturating_sub(label_width));
-        lines.push(Line::from(vec![
-            Span::styled(format!("{:<label_width$}", driver_label), label_style),
-            Span::styled(driver_info, value_style),
-        ]));
-
         // Строка 2: VRAM
         if let Some(memory) = gpu.memory.as_ref() {
             let mem_pct = percent(memory.used_bytes, memory.total_bytes);
@@ -164,6 +179,17 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                 Span::styled(format!(" {:>3.0}%", fan_pct), value_style),
             ]));
         }
+
+        let driver_label = tr(app.language, "Driver", "Драйвер");
+        let version_label = tr(app.language, "Version", "Версия");
+        let driver = gpu.driver.as_deref().unwrap_or(na_label);
+        let version = gpu.driver_version.as_deref().unwrap_or(na_label);
+        let driver_info = format!("{driver} | {version_label} {version}");
+        let driver_info = fit_text(&driver_info, width.saturating_sub(label_width));
+        lines.push(Line::from(vec![
+            Span::styled(format!("{:<label_width$}", driver_label), label_style),
+            Span::styled(driver_info, value_style),
+        ]));
     } else {
         lines.push(Line::from(Span::styled(
             fit_text(

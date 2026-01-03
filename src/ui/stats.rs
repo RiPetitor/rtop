@@ -2,24 +2,29 @@ use ratatui::prelude::*;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-use super::panel_block;
 use super::text::tr;
 use super::theme::{COLOR_MUTED, color_for_percent};
+use super::{panel_block, panel_block_focused};
 use crate::app::App;
 use crate::utils::{format_bytes, percent, render_bar, text_width};
 
-pub fn render(frame: &mut Frame, area: Rect, app: &App) {
+pub fn render_with_focus(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
-    render_cpu_panel(frame, chunks[0], app);
-    render_memory_panel(frame, chunks[1], app);
+    render_cpu_panel(frame, chunks[0], app, focused);
+    render_memory_panel(frame, chunks[1], app, focused);
 }
 
-fn render_cpu_panel(frame: &mut Frame, area: Rect, app: &App) {
-    let block = panel_block(tr(app.language, "CPU", "CPU"));
+fn render_cpu_panel(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
+    let title = tr(app.language, "CPU", "CPU");
+    let block = if focused {
+        panel_block_focused(title)
+    } else {
+        panel_block(title)
+    };
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -94,12 +99,17 @@ fn render_cpu_panel(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(paragraph, inner);
 }
 
-fn render_memory_panel(frame: &mut Frame, area: Rect, app: &App) {
+fn render_memory_panel(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
     let total_mem = app.system.total_memory();
     let used_mem = app.system.used_memory();
     let total_swap = app.system.total_swap();
     let used_swap = app.system.used_swap();
-    let block = panel_block(tr(app.language, "Memory", "Память"));
+    let title = tr(app.language, "Memory", "Память");
+    let block = if focused {
+        panel_block_focused(title)
+    } else {
+        panel_block(title)
+    };
     let inner = block.inner(area);
     let total_width = inner.width.max(1) as usize;
 

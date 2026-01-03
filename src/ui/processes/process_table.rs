@@ -1,14 +1,18 @@
 use ratatui::prelude::*;
 use ratatui::widgets::{Cell, Row, Table, TableState};
 
-use super::super::panel_block;
 use super::super::text::tr;
 use super::super::theme::{COLOR_ACCENT, COLOR_GOOD, COLOR_MUTED};
+use super::super::{panel_block, panel_block_focused};
 use crate::app::{App, HighlightMode};
 use crate::data::{SortDir, SortKey};
 use crate::utils::{fit_text, format_bytes, format_duration_short};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
+    render_with_focus(frame, area, app, false);
+}
+
+pub fn render_with_focus(frame: &mut Frame, area: Rect, app: &mut App, focused: bool) {
     let process_area = area;
     update_process_header_regions(app, process_area);
     let panel_title = if app.tree_view {
@@ -16,7 +20,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     } else {
         tr(app.language, "Processes", "Процессы")
     };
-    let block = panel_block(panel_title);
+    let block = if focused {
+        panel_block_focused(panel_title)
+    } else {
+        panel_block(panel_title)
+    };
     let inner = block.inner(process_area);
     app.process_body = if inner.width > 0 && inner.height > 1 {
         Some(Rect {
