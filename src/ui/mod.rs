@@ -77,7 +77,7 @@ fn render_overview(frame: &mut Frame, app: &mut App, size: Rect) {
     let header_height = 5;
     let footer_height = 4;
 
-    // Если Processes развёрнут - показать только его
+    // If Processes is expanded - show only that panel
     if app.processes_expanded {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -97,7 +97,7 @@ fn render_overview(frame: &mut Frame, app: &mut App, size: Rect) {
         return;
     }
 
-    // Обычный режим
+    // Normal mode
     let min_process_height = 8;
     let available = size
         .height

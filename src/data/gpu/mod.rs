@@ -249,13 +249,13 @@ fn short_vendor_name(vendor: &str) -> &'static str {
     "GPU"
 }
 
-/// Извлекает короткое имя модели GPU из полного описания
+/// Extracts short GPU model name from full description
 /// "Navi 32 [Radeon RX 7700 XT / 7800 XT]" -> "RX 7700 XT"
 /// "Advanced Micro Devices, Inc. [AMD/ATI] Navi 32 [Radeon RX 7700 XT / 7800 XT]" -> "RX 7700 XT"
 /// "GeForce RTX 4080" -> "RTX 4080"
 pub fn short_device_name(device: &str) -> String {
-    // Ищем последние квадратные скобки (там обычно модель)
-    // Пропускаем [AMD/ATI], [NVIDIA] и подобные
+    // Find last square brackets (model is usually there)
+    // Skip [AMD/ATI], [NVIDIA] and similar vendor tags
     let mut best_match: Option<String> = None;
     let mut search_from = 0;
 
@@ -264,18 +264,18 @@ pub fn short_device_name(device: &str) -> String {
         if let Some(end) = device[abs_start..].find(']') {
             let bracket_content = &device[abs_start + 1..abs_start + end];
 
-            // Пропускаем короткие вендорные теги типа [AMD/ATI], [NVIDIA]
+            // Skip short vendor tags like [AMD/ATI], [NVIDIA]
             if !bracket_content.contains("AMD/ATI")
                 && !bracket_content.contains("NVIDIA")
                 && !bracket_content.contains("Intel")
                 && bracket_content.len() > 5
             {
-                // Извлекаем первую модель до " / "
+                // Extract first model before " / "
                 let model = bracket_content
                     .split(" / ")
                     .next()
                     .unwrap_or(bracket_content);
-                // Убираем префиксы типа "Radeon "
+                // Remove prefixes like "Radeon "
                 let cleaned = model
                     .trim_start_matches("Radeon ")
                     .trim_start_matches("GeForce ")
@@ -295,12 +295,12 @@ pub fn short_device_name(device: &str) -> String {
         return name;
     }
 
-    // Ищем известные паттерны моделей
+    // Search for known model patterns
     let patterns = ["RTX ", "GTX ", "RX ", "Arc ", "Iris ", "UHD ", "Quadro "];
     for pattern in patterns {
         if let Some(pos) = device.find(pattern) {
             let rest = &device[pos..];
-            // Берём до конца слова/числа модели
+            // Take until end of model word/number
             let end = rest
                 .find(|c: char| c == '[' || c == '(' || c == ',')
                 .unwrap_or(rest.len());
@@ -308,7 +308,7 @@ pub fn short_device_name(device: &str) -> String {
         }
     }
 
-    // Fallback: первые 20 символов
+    // Fallback: first 20 characters
     if device.len() > 20 {
         format!("{}...", &device[..20])
     } else {

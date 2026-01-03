@@ -116,7 +116,7 @@ fn render_memory_panel(frame: &mut Frame, area: Rect, app: &App, focused: bool) 
     let mem_pct = percent(used_mem, total_mem);
     let swap_pct = percent(used_swap, total_swap);
 
-    // Собираем GPU память
+    // Collect GPU memory
     let (gpu_used, gpu_total) = app
         .selected_gpu()
         .and_then(|(_, gpu)| gpu.memory.as_ref())

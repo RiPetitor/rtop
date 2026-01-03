@@ -152,16 +152,16 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
                 app.enter_container();
             } else if app.view_mode == ViewMode::Overview {
                 if app.processes_expanded {
-                    // В развёрнутом режиме - kill процесса
+                    // Expanded mode - kill process
                     app.open_confirm();
                 } else {
-                    // В обычном режиме - развернуть Processes
+                    // Normal mode - expand Processes panel
                     app.expand_processes();
                 }
             } else if app.view_mode == ViewMode::GpuFocus {
                 use crate::app::GpuFocusPanel;
                 if app.gpu_panel_expanded && app.gpu_focus_panel == GpuFocusPanel::Processes {
-                    // В развёрнутом режиме Processes - kill процесса
+                    // Expanded Processes mode - kill process
                     if let Some(pid) = app.selected_gpu_process_pid() {
                         app.open_confirm_for_pid(pid);
                     } else {
@@ -171,10 +171,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
                         );
                     }
                 } else if !app.gpu_panel_expanded {
-                    // В обычном режиме - развернуть панель
+                    // Normal mode - expand panel
                     app.expand_gpu_panel();
                 }
-                // В развёрнутом Dashboard - Enter ничего не делает
+                // Expanded Dashboard - Enter does nothing
             } else {
                 app.open_confirm();
             }
@@ -237,13 +237,13 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
             EventResult::Continue
         }
         KeyCode::Tab => {
-            // Tab переключает панели внутри текущей вкладки
+            // Tab switches panels within current view
             if app.view_mode == ViewMode::Overview && !app.processes_expanded {
                 app.toggle_processes_focus();
             } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
                 app.toggle_gpu_focus_panel();
             }
-            // Переключение вкладок - только цифрами (1-5)
+            // View switching is done with number keys (1-5)
             EventResult::Continue
         }
         KeyCode::BackTab => {

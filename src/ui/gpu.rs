@@ -19,7 +19,7 @@ fn render_inner(frame: &mut Frame, area: Rect, app: &mut App, _focused: bool) {
         return;
     }
 
-    // Если панель развёрнута - показать только её
+    // If panel is expanded - show only that panel
     if app.gpu_panel_expanded {
         match app.gpu_focus_panel {
             GpuFocusPanel::Dashboard => {
@@ -32,7 +32,7 @@ fn render_inner(frame: &mut Frame, area: Rect, app: &mut App, _focused: bool) {
         return;
     }
 
-    // Обычный режим - обе панели
+    // Normal mode - both panels
     const MIN_DETAIL_HEIGHT: u16 = 7;
     const MIN_TABLE_HEIGHT: u16 = 6;
 
@@ -97,7 +97,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
         let total_gpus = app.gpu_list.len();
         let na_label = tr(app.language, "n/a", "н/д");
 
-        // Краткое имя: "AMD RX 7700 XT" или "[1/2] AMD RX 7700 XT"
+        // Short name: "AMD RX 7700 XT" or "[1/2] AMD RX 7700 XT"
         let vendor_short = gpu_vendor_label(gpu);
         let device_name = gpu.device.as_deref().unwrap_or(&gpu.name);
         let device_short = short_device_name(device_name);
@@ -113,11 +113,11 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
             format!("{} {}", vendor_short, device_short)
         };
 
-        // Выравнивание: все метки одинаковой ширины
+        // Alignment: all labels same width
         let label_width = gpu_label.len() + 2;
         let bar_width = calc_bar_width(width, 35);
 
-        // Строка 1: GPU название + бар утилизации | температура | мощность
+        // Line 1: GPU name + utilization bar | temperature | power
         let util_pct = gpu.telemetry.utilization_gpu_pct.unwrap_or(0.0);
         let util_bar = render_bar(util_pct, bar_width);
         let temp_str = gpu
@@ -141,7 +141,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
             Span::styled(power_str, value_style),
         ]));
 
-        // Строка 2: VRAM
+        // Line 2: VRAM
         if let Some(memory) = gpu.memory.as_ref() {
             let mem_pct = percent(memory.used_bytes, memory.total_bytes);
             let mem_bar = render_bar(mem_pct, bar_width);
@@ -157,7 +157,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
             ]));
         }
 
-        // Строка 3: Encoder + бар | Decoder только процент
+        // Line 3: Encoder + bar | Decoder percentage only
         let enc_pct = gpu.telemetry.encoder_pct.unwrap_or(0.0);
         let dec_pct = gpu.telemetry.decoder_pct.unwrap_or(0.0);
         let enc_bar = render_bar(enc_pct, bar_width);
@@ -170,7 +170,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App, focused: bool) {
             Span::styled(format!("{:>3.0}%", dec_pct), value_style),
         ]));
 
-        // Строка 4: Fan
+        // Line 4: Fan
         if let Some(fan_pct) = gpu.telemetry.fan_speed_pct {
             let fan_bar = render_bar(fan_pct, bar_width);
             lines.push(Line::from(vec![

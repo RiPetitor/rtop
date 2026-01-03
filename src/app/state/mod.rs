@@ -395,7 +395,7 @@ impl App {
     }
 
     pub fn toggle_tree_view(&mut self) {
-        // Tree view работает в Processes, Overview и при развёрнутых процессах
+        // Tree view works in Processes, Overview, and when processes are expanded
         let allowed = self.view_mode == ViewMode::Processes || self.view_mode == ViewMode::Overview;
         if !allowed {
             return;
