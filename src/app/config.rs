@@ -6,7 +6,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use super::state::Language;
-use super::{LogoMode, LogoQuality};
+use super::{IconMode, LogoMode, LogoQuality};
 use crate::data::{GpuPreference, SortDir, SortKey};
 
 const MIN_TICK_MS: u64 = 100;
@@ -21,6 +21,7 @@ pub struct Config {
     pub gpu_pref: GpuPreference,
     pub gpu_poll_rate: Duration,
     pub language: Language,
+    pub icon_mode: IconMode,
     pub logo_mode: LogoMode,
     pub logo_quality: LogoQuality,
 }
@@ -57,6 +58,7 @@ struct DisplayConfig {
     sort_dir: String,
     gpu_preference: String,
     language: String,
+    icon_mode: String,
     logo_mode: String,
     logo_quality: String,
 }
@@ -69,6 +71,7 @@ impl Default for DisplayConfig {
             sort_dir: String::new(),
             gpu_preference: "auto".to_string(),
             language: "en".to_string(),
+            icon_mode: "text".to_string(),
             logo_mode: "ascii".to_string(),
             logo_quality: "medium".to_string(),
         }
@@ -101,6 +104,7 @@ impl Config {
         let mut gpu_pref = GpuPreference::parse(&file_config.display.gpu_preference)
             .unwrap_or(GpuPreference::Auto);
         let language = Language::parse(&file_config.display.language).unwrap_or(Language::English);
+        let icon_mode = IconMode::parse(&file_config.display.icon_mode).unwrap_or(IconMode::Text);
         let logo_mode = LogoMode::parse(&file_config.display.logo_mode).unwrap_or(LogoMode::Ascii);
         let logo_quality =
             LogoQuality::parse(&file_config.display.logo_quality).unwrap_or(LogoQuality::Medium);
@@ -158,6 +162,7 @@ impl Config {
             gpu_pref,
             gpu_poll_rate: Duration::from_millis(gpu_poll_ms),
             language,
+            icon_mode,
             logo_mode,
             logo_quality,
         })
@@ -214,6 +219,7 @@ fn load_config_root(path: &PathBuf) -> Result<toml::Value, String> {
 
 pub fn save_display_preferences(
     language: Language,
+    icon_mode: IconMode,
     logo_mode: LogoMode,
     logo_quality: LogoQuality,
 ) -> Result<(), String> {
@@ -241,6 +247,10 @@ pub fn save_display_preferences(
     display_table.insert(
         "language".to_string(),
         toml::Value::String(language.code().to_string()),
+    );
+    display_table.insert(
+        "icon_mode".to_string(),
+        toml::Value::String(icon_mode.code().to_string()),
     );
     display_table.insert(
         "logo_mode".to_string(),

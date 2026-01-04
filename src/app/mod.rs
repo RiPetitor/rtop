@@ -8,8 +8,8 @@ pub use config::Config;
 pub use highlight::HighlightMode;
 pub use state::App;
 pub use state::logo::{
-    AsciiCell, AsciiLogo, LogoCache, LogoCell, LogoMode, LogoPalette, LogoQuality, RenderedLogo,
-    RgbColor, RgbaColor, SvgLogo,
+    AsciiCell, AsciiLogo, IconMode, LogoCache, LogoCell, LogoMode, LogoPalette, LogoQuality,
+    RenderedLogo, RgbColor, RgbaColor, SvgLogo,
 };
 pub use state::{
     GpuProcessHeaderRegion, GpuProcessSortKey, HeaderRegion, Language, SetupField,

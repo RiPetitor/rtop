@@ -20,7 +20,7 @@ use super::status::{StatusLevel, StatusMessage};
 use super::view_mode::{GpuFocusPanel, ViewMode};
 use crate::data::gpu::{GpuInfo, GpuPreference, GpuProcessUsage, GpuSnapshot, start_gpu_monitor};
 use crate::data::{ContainerKey, ContainerRow, NetSample, ProcessRow, SortDir, SortKey};
-use logo::{LogoCache, LogoMode, LogoQuality};
+use logo::{IconMode, LogoCache, LogoMode, LogoQuality};
 
 pub struct ConfirmKill {
     pub pid: u32,
@@ -172,6 +172,7 @@ impl SystemTab {
 pub enum SetupField {
     #[default]
     Language,
+    IconMode,
     LogoMode,
     LogoQuality,
 }
@@ -179,7 +180,8 @@ pub enum SetupField {
 impl SetupField {
     pub fn next(self) -> Self {
         match self {
-            SetupField::Language => SetupField::LogoMode,
+            SetupField::Language => SetupField::IconMode,
+            SetupField::IconMode => SetupField::LogoMode,
             SetupField::LogoMode => SetupField::LogoQuality,
             SetupField::LogoQuality => SetupField::Language,
         }
@@ -188,7 +190,8 @@ impl SetupField {
     pub fn prev(self) -> Self {
         match self {
             SetupField::Language => SetupField::LogoQuality,
-            SetupField::LogoMode => SetupField::Language,
+            SetupField::IconMode => SetupField::Language,
+            SetupField::LogoMode => SetupField::IconMode,
             SetupField::LogoQuality => SetupField::LogoMode,
         }
     }
@@ -282,6 +285,7 @@ pub struct App {
     pub system_tab_regions: Vec<SystemTabRegion>,
     pub system_update_region: Option<Rect>,
     pub system_overview_snapshot: Option<SystemOverviewSnapshot>,
+    pub icon_mode: IconMode,
     pub logo_mode: LogoMode,
     pub logo_quality: LogoQuality,
     pub logo_cache: Option<LogoCache>,
@@ -361,6 +365,7 @@ impl App {
             system_tab_regions: Vec::new(),
             system_update_region: None,
             system_overview_snapshot: None,
+            icon_mode: config.icon_mode,
             logo_mode: config.logo_mode,
             logo_quality: config.logo_quality,
             logo_cache: None,
@@ -566,6 +571,7 @@ impl App {
     pub fn next_setup_value(&mut self) {
         match self.setup_field {
             SetupField::Language => self.toggle_language(),
+            SetupField::IconMode => self.toggle_icon_mode(),
             SetupField::LogoMode => self.toggle_logo_mode(),
             SetupField::LogoQuality => self.next_logo_quality(),
         }
@@ -574,8 +580,25 @@ impl App {
     pub fn prev_setup_value(&mut self) {
         match self.setup_field {
             SetupField::Language => self.toggle_language(),
+            SetupField::IconMode => self.toggle_icon_mode(),
             SetupField::LogoMode => self.toggle_logo_mode(),
             SetupField::LogoQuality => self.prev_logo_quality(),
+        }
+    }
+
+    pub fn toggle_icon_mode(&mut self) {
+        self.icon_mode = self.icon_mode.toggle();
+        self.system_overview_snapshot = None;
+        if let Err(err) = super::config::save_display_preferences(
+            self.language,
+            self.icon_mode,
+            self.logo_mode,
+            self.logo_quality,
+        ) {
+            self.set_status(
+                StatusLevel::Warn,
+                format!("Failed to save display preferences: {err}"),
+            );
         }
     }
 
@@ -584,6 +607,7 @@ impl App {
         self.system_overview_snapshot = None;
         if let Err(err) = super::config::save_display_preferences(
             self.language,
+            self.icon_mode,
             self.logo_mode,
             self.logo_quality,
         ) {
@@ -601,6 +625,7 @@ impl App {
         }
         if let Err(err) = super::config::save_display_preferences(
             self.language,
+            self.icon_mode,
             self.logo_mode,
             self.logo_quality,
         ) {
@@ -629,6 +654,7 @@ impl App {
         }
         if let Err(err) = super::config::save_display_preferences(
             self.language,
+            self.icon_mode,
             self.logo_mode,
             self.logo_quality,
         ) {

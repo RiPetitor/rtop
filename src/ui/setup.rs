@@ -4,7 +4,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
 use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_BORDER, COLOR_MUTED};
-use crate::app::{App, Language, LogoMode, LogoQuality, SetupField};
+use crate::app::{App, IconMode, Language, LogoMode, LogoQuality, SetupField};
 
 pub fn render(frame: &mut Frame, app: &App) {
     if !app.show_setup {
@@ -30,6 +30,11 @@ pub fn render(frame: &mut Frame, app: &App) {
     } else {
         label_style
     };
+    let icon_label_style = if app.setup_field == SetupField::IconMode {
+        active_label_style
+    } else {
+        label_style
+    };
     let logo_label_style = if app.setup_field == SetupField::LogoMode {
         active_label_style
     } else {
@@ -47,6 +52,16 @@ pub fn render(frame: &mut Frame, app: &App) {
         hint_style
     };
     let ru_style = if app.language == Language::Russian {
+        key_style
+    } else {
+        hint_style
+    };
+    let nerd_style = if app.icon_mode == IconMode::Nerd {
+        key_style
+    } else {
+        hint_style
+    };
+    let text_icon_style = if app.icon_mode == IconMode::Text {
         key_style
     } else {
         hint_style
@@ -92,6 +107,13 @@ pub fn render(frame: &mut Frame, app: &App) {
             Span::styled("English", en_style),
             Span::styled("  ", hint_style),
             Span::styled(ru_label, ru_style),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(tr(app.language, "Icons: ", "Иконки: "), icon_label_style),
+            Span::styled("Nerd Fonts", nerd_style),
+            Span::styled("  ", hint_style),
+            Span::styled(tr(app.language, "Text", "Текст"), text_icon_style),
         ]),
         Line::from(""),
         Line::from(vec![

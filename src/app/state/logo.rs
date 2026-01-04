@@ -1,6 +1,37 @@
 use resvg::usvg;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum IconMode {
+    Nerd,
+    #[default]
+    Text,
+}
+
+impl IconMode {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "nerd" | "nerdfont" | "nerdfonts" => Some(IconMode::Nerd),
+            "text" | "ascii" | "plain" => Some(IconMode::Text),
+            _ => None,
+        }
+    }
+
+    pub fn code(self) -> &'static str {
+        match self {
+            IconMode::Nerd => "nerd",
+            IconMode::Text => "text",
+        }
+    }
+
+    pub fn toggle(self) -> Self {
+        match self {
+            IconMode::Nerd => IconMode::Text,
+            IconMode::Text => IconMode::Nerd,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LogoMode {
     #[default]
     Ascii,
