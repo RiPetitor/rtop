@@ -90,6 +90,26 @@ Minimum terminal size: 60x22.
 - Left click column header — sort by column / toggle direction.
 - In tree mode, sorting is fixed by PID.
 
+### Nerd Fonts (Recommended)
+
+rtop uses [Nerd Fonts](https://www.nerdfonts.com/) icons for a beautiful display in the System tab. If you see squares instead of icons, you need to install a Nerd Font.
+
+**Quick install:**
+
+```bash
+# Download and install a Nerd Font (e.g., JetBrainsMono)
+mkdir -p ~/.local/share/fonts
+cd ~/.local/share/fonts
+curl -fLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+unzip JetBrainsMono.zip -d JetBrainsMono
+rm JetBrainsMono.zip
+fc-cache -fv
+```
+
+Then set the font in your terminal emulator settings.
+
+**Alternative:** If you can't install Nerd Fonts, press F2 and change "Icons" to "Text" mode.
+
 ### Configuration
 
 File: `~/.config/rtop/config.toml`
@@ -105,14 +125,16 @@ default_sort = "cpu"
 sort_dir = "desc"
 gpu_preference = "auto"
 language = "en"
+icon_mode = "text"
 logo_mode = "ascii"
 logo_quality = "medium"
 ```
 
 CLI args override the config.
-Display settings are saved to the config when toggled in Setup (language, logo mode, logo quality).
+Display settings are saved to the config when toggled in Setup (language, icon mode, logo mode, logo quality).
 
 Display options:
+- `icon_mode`: `text` (plain text labels, default) or `nerd` (Nerd Fonts icons)
 - `logo_mode`: `ascii` or `svg`
 - `logo_quality`: `quality` (Smoothed), `medium` (Medium), `pixel` (Detailed)
 
@@ -263,6 +285,26 @@ rtop [options]
 - ЛКМ по заголовку колонки — сортировка по колонке / смена направления.
 - В режиме дерева сортировка фиксирована по PID.
 
+### Nerd Fonts (Рекомендуется)
+
+rtop использует иконки [Nerd Fonts](https://www.nerdfonts.com/) для красивого отображения во вкладке Система. Если вы видите квадратики вместо иконок, вам нужно установить Nerd Font.
+
+**Быстрая установка:**
+
+```bash
+# Скачать и установить Nerd Font (например, JetBrainsMono)
+mkdir -p ~/.local/share/fonts
+cd ~/.local/share/fonts
+curl -fLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+unzip JetBrainsMono.zip -d JetBrainsMono
+rm JetBrainsMono.zip
+fc-cache -fv
+```
+
+Затем установите шрифт в настройках вашего терминала.
+
+**Альтернатива:** Если вы не можете установить Nerd Fonts, нажмите F2 и измените "Иконки" на режим "Текст".
+
 ### Конфигурация
 
 Файл: `~/.config/rtop/config.toml`
@@ -278,14 +320,16 @@ default_sort = "cpu"
 sort_dir = "desc"
 gpu_preference = "auto"
 language = "en"
+icon_mode = "text"
 logo_mode = "ascii"
 logo_quality = "medium"
 ```
 
 CLI‑аргументы имеют приоритет над конфигом.
-Параметры отображения сохраняются в конфиге при переключении в Setup (язык, режим лого, качество лого).
+Параметры отображения сохраняются в конфиге при переключении в Setup (язык, режим иконок, режим лого, качество лого).
 
 Опции отображения:
+- `icon_mode`: `text` (текстовые метки, по умолчанию) или `nerd` (иконки Nerd Fonts)
 - `logo_mode`: `ascii` или `svg`
 - `logo_quality`: `quality` (Сглаженный), `medium` (Средне), `pixel` (Детальный)
 
