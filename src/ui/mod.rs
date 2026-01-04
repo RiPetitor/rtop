@@ -25,6 +25,8 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     app.gpu_process_header_regions.clear();
     app.gpu_process_body = None;
     app.gpu_process_order.clear();
+    app.system_tab_regions.clear();
+    app.system_update_region = None;
     let size = frame.area();
     if size.width < 60 || size.height < 22 {
         let msg = Paragraph::new(tr(

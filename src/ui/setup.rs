@@ -4,7 +4,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
 use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_BORDER, COLOR_MUTED};
-use crate::app::{App, Language};
+use crate::app::{App, Language, LogoMode, LogoQuality, SetupField};
 
 pub fn render(frame: &mut Frame, app: &App) {
     if !app.show_setup {
@@ -22,12 +22,56 @@ pub fn render(frame: &mut Frame, app: &App) {
         .add_modifier(Modifier::BOLD);
     let hint_style = Style::default().fg(COLOR_MUTED);
 
+    let active_label_style = Style::default()
+        .fg(COLOR_ACCENT)
+        .add_modifier(Modifier::BOLD);
+    let language_label_style = if app.setup_field == SetupField::Language {
+        active_label_style
+    } else {
+        label_style
+    };
+    let logo_label_style = if app.setup_field == SetupField::LogoMode {
+        active_label_style
+    } else {
+        label_style
+    };
+    let quality_label_style = if app.setup_field == SetupField::LogoQuality {
+        active_label_style
+    } else {
+        label_style
+    };
+
     let en_style = if app.language == Language::English {
         key_style
     } else {
         hint_style
     };
     let ru_style = if app.language == Language::Russian {
+        key_style
+    } else {
+        hint_style
+    };
+    let ascii_style = if app.logo_mode == LogoMode::Ascii {
+        key_style
+    } else {
+        hint_style
+    };
+    let svg_style = if app.logo_mode == LogoMode::Svg {
+        key_style
+    } else {
+        hint_style
+    };
+    let quality_style = if app.logo_quality == LogoQuality::Quality {
+        key_style
+    } else {
+        hint_style
+    };
+    let medium_style = if app.logo_quality == LogoQuality::Medium {
+        key_style
+    } else {
+        hint_style
+    };
+    let pixel_style = if app.logo_quality == LogoQuality::Pixel {
         key_style
     } else {
         hint_style
@@ -41,10 +85,32 @@ pub fn render(frame: &mut Frame, app: &App) {
         )),
         Line::from(""),
         Line::from(vec![
-            Span::styled(tr(app.language, "Language: ", "Язык: "), label_style),
+            Span::styled(
+                tr(app.language, "Language: ", "Язык: "),
+                language_label_style,
+            ),
             Span::styled("English", en_style),
             Span::styled("  ", hint_style),
             Span::styled(ru_label, ru_style),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(tr(app.language, "Logo: ", "Логотип: "), logo_label_style),
+            Span::styled("ASCII", ascii_style),
+            Span::styled("  ", hint_style),
+            Span::styled("SVG", svg_style),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                tr(app.language, "Quality: ", "Качество: "),
+                quality_label_style,
+            ),
+            Span::styled(tr(app.language, "Smoothed", "Сглаженный"), quality_style),
+            Span::styled("  ", hint_style),
+            Span::styled(tr(app.language, "Medium", "Средне"), medium_style),
+            Span::styled("  ", hint_style),
+            Span::styled(tr(app.language, "Detailed", "Детальный"), pixel_style),
         ]),
         Line::from(""),
         Line::from(vec![
@@ -69,9 +135,14 @@ pub fn render(frame: &mut Frame, app: &App) {
         ]),
         Line::from(""),
         Line::from(vec![
+            Span::styled("Up/Down", key_style),
+            Span::styled(
+                format!(" {}  ", tr(app.language, "select", "выбор")),
+                hint_style,
+            ),
             Span::styled("Left/Right", key_style),
             Span::styled(
-                format!(" {}  ", tr(app.language, "toggle language", "смена языка")),
+                format!(" {}  ", tr(app.language, "change", "изменить")),
                 hint_style,
             ),
             Span::styled("Esc", key_style),

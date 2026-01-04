@@ -84,7 +84,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         "Esc/b/и",
         tr(app.language, "Back/Close", "Назад/Закрыть"),
         "Tab",
-        tr(app.language, "Switch panel", "Сменить панель"),
+        tr(app.language, "Switch panel/tab", "Панель/вкладка"),
         col1,
         col2,
         key_style,
@@ -99,7 +99,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     )));
     lines.push(make_row(
         "←/→",
-        tr(app.language, "Change column", "Сменить колонку"),
+        tr(app.language, "Change column/tab", "Колонка/вкладка"),
         "Space",
         tr(app.language, "Toggle order", "Изменить порядок"),
         col1,

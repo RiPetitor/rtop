@@ -1,6 +1,7 @@
 mod actions;
 mod containers;
 mod gpu;
+pub(crate) mod logo;
 mod rows;
 mod selection;
 mod tree;
@@ -11,7 +12,7 @@ use std::time::Instant;
 
 use ratatui::prelude::Rect;
 use ratatui::widgets::TableState;
-use sysinfo::{Pid, System, Uid, Users};
+use sysinfo::{Components, Disks, Networks, Pid, System, Uid, Users};
 
 use super::config::Config;
 use super::highlight::HighlightMode;
@@ -19,6 +20,7 @@ use super::status::{StatusLevel, StatusMessage};
 use super::view_mode::{GpuFocusPanel, ViewMode};
 use crate::data::gpu::{GpuInfo, GpuPreference, GpuProcessUsage, GpuSnapshot, start_gpu_monitor};
 use crate::data::{ContainerKey, ContainerRow, NetSample, ProcessRow, SortDir, SortKey};
+use logo::{LogoCache, LogoMode, LogoQuality};
 
 pub struct ConfirmKill {
     pub pid: u32,
@@ -131,6 +133,94 @@ pub struct GpuProcessHeaderRegion {
     pub rect: Rect,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SystemTab {
+    #[default]
+    Overview,
+    Cpu,
+    Memory,
+    Disks,
+    Network,
+    Temps,
+}
+
+impl SystemTab {
+    pub fn next(self) -> Self {
+        match self {
+            SystemTab::Overview => SystemTab::Cpu,
+            SystemTab::Cpu => SystemTab::Memory,
+            SystemTab::Memory => SystemTab::Disks,
+            SystemTab::Disks => SystemTab::Network,
+            SystemTab::Network => SystemTab::Temps,
+            SystemTab::Temps => SystemTab::Overview,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            SystemTab::Overview => SystemTab::Temps,
+            SystemTab::Cpu => SystemTab::Overview,
+            SystemTab::Memory => SystemTab::Cpu,
+            SystemTab::Disks => SystemTab::Memory,
+            SystemTab::Network => SystemTab::Disks,
+            SystemTab::Temps => SystemTab::Network,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SetupField {
+    #[default]
+    Language,
+    LogoMode,
+    LogoQuality,
+}
+
+impl SetupField {
+    pub fn next(self) -> Self {
+        match self {
+            SetupField::Language => SetupField::LogoMode,
+            SetupField::LogoMode => SetupField::LogoQuality,
+            SetupField::LogoQuality => SetupField::Language,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            SetupField::Language => SetupField::LogoQuality,
+            SetupField::LogoMode => SetupField::Language,
+            SetupField::LogoQuality => SetupField::LogoMode,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct SystemTabRegion {
+    pub tab: SystemTab,
+    pub rect: Rect,
+}
+
+#[derive(Clone, Debug)]
+pub struct SystemOverviewSnapshot {
+    pub user_host: String,
+    pub distro_line: String,
+    pub os_name: String,
+    pub kernel_line: String,
+    pub uptime_line: String,
+    pub board_line: String,
+    pub cpu_line: String,
+    pub gpu_line: String,
+    pub mem_line: String,
+    pub disk_lines: Vec<String>,
+    pub display_line: String,
+    pub mouse_line: String,
+    pub de_line: String,
+    pub wm_line: String,
+    pub shell_line: String,
+    pub terminal_line: String,
+    pub package_line: String,
+}
+
 #[derive(Default, Clone, Copy)]
 struct ProcessGpuUsage {
     sm_pct: Option<f32>,
@@ -170,6 +260,10 @@ impl ProcessGpuUsage {
 
 pub struct App {
     pub system: System,
+    pub disks: Disks,
+    pub networks: Networks,
+    pub components: Components,
+    pub network_refresh_secs: Option<f64>,
     users: Users,
     current_user_id: Option<Uid>,
     pub sort_key: SortKey,
@@ -184,6 +278,13 @@ pub struct App {
     pub process_header_regions: Vec<HeaderRegion>,
     pub gpu_process_header_regions: Vec<GpuProcessHeaderRegion>,
     pub gpu_process_body: Option<Rect>,
+    pub system_tab: SystemTab,
+    pub system_tab_regions: Vec<SystemTabRegion>,
+    pub system_update_region: Option<Rect>,
+    pub system_overview_snapshot: Option<SystemOverviewSnapshot>,
+    pub logo_mode: LogoMode,
+    pub logo_quality: LogoQuality,
+    pub logo_cache: Option<LogoCache>,
     pub gpu_process_order: Vec<u32>,
     pub gpu_process_scroll: usize,
     pub gpu_process_sort_key: GpuProcessSortKey,
@@ -198,6 +299,7 @@ pub struct App {
     container_net_rates: HashMap<u64, u64>,
     container_netns_cache: HashMap<ContainerKey, u64>,
     container_net_last_sample: Option<Instant>,
+    network_last_refresh: Option<Instant>,
     pub confirm: Option<ConfirmKill>,
     pub highlight_mode: HighlightMode,
     pub vram_enabled: bool,
@@ -214,6 +316,7 @@ pub struct App {
     pub processes_expanded: bool,
     pub show_setup: bool,
     pub show_help: bool,
+    pub setup_field: SetupField,
     pub language: Language,
 }
 
@@ -222,6 +325,9 @@ impl App {
         let mut system = System::new_all();
         system.refresh_all();
         let users = Users::new_with_refreshed_list();
+        let disks = Disks::new_with_refreshed_list();
+        let networks = Networks::new_with_refreshed_list();
+        let components = Components::new_with_refreshed_list();
         let current_user_id = system
             .process(Pid::from_u32(std::process::id()))
             .and_then(|process| process.user_id())
@@ -233,6 +339,10 @@ impl App {
         };
         let mut app = Self {
             system,
+            disks,
+            networks,
+            components,
+            network_refresh_secs: None,
             users,
             current_user_id,
             sort_key: config.sort_key,
@@ -247,6 +357,13 @@ impl App {
             process_header_regions: Vec::new(),
             gpu_process_header_regions: Vec::new(),
             gpu_process_body: None,
+            system_tab: SystemTab::default(),
+            system_tab_regions: Vec::new(),
+            system_update_region: None,
+            system_overview_snapshot: None,
+            logo_mode: config.logo_mode,
+            logo_quality: config.logo_quality,
+            logo_cache: None,
             gpu_process_order: Vec::new(),
             gpu_process_scroll: 0,
             gpu_process_sort_key: GpuProcessSortKey::Sm,
@@ -261,6 +378,7 @@ impl App {
             container_net_rates: HashMap::new(),
             container_netns_cache: HashMap::new(),
             container_net_last_sample: None,
+            network_last_refresh: Some(Instant::now()),
             confirm: None,
             highlight_mode: HighlightMode::default(),
             vram_enabled: config.vram_enabled,
@@ -277,6 +395,7 @@ impl App {
             processes_expanded: false,
             show_setup: false,
             show_help: false,
+            setup_field: SetupField::default(),
             language: config.language,
         };
         app.update_rows();
@@ -287,6 +406,15 @@ impl App {
     pub fn refresh(&mut self) {
         self.system.refresh_all();
         self.users.refresh();
+        let now = Instant::now();
+        self.network_refresh_secs = self
+            .network_last_refresh
+            .map(|previous| now.saturating_duration_since(previous).as_secs_f64())
+            .filter(|value| *value > 0.0);
+        self.networks.refresh(true);
+        self.network_last_refresh = Some(now);
+        self.disks.refresh(true);
+        self.components.refresh(true);
         self.update_rows();
         let needs_containers =
             matches!(self.view_mode, ViewMode::Container) || self.container_filter.is_some();
@@ -412,6 +540,7 @@ impl App {
         self.show_setup = !self.show_setup;
         if self.show_setup {
             self.show_help = false;
+            self.setup_field = SetupField::Language;
         }
     }
 
@@ -422,10 +551,91 @@ impl App {
         }
     }
 
+    pub fn next_setup_field(&mut self) {
+        self.setup_field = self.setup_field.next();
+    }
+
+    pub fn prev_setup_field(&mut self) {
+        self.setup_field = self.setup_field.prev();
+    }
+
+    pub fn toggle_setup_field(&mut self) {
+        self.next_setup_value();
+    }
+
+    pub fn next_setup_value(&mut self) {
+        match self.setup_field {
+            SetupField::Language => self.toggle_language(),
+            SetupField::LogoMode => self.toggle_logo_mode(),
+            SetupField::LogoQuality => self.next_logo_quality(),
+        }
+    }
+
+    pub fn prev_setup_value(&mut self) {
+        match self.setup_field {
+            SetupField::Language => self.toggle_language(),
+            SetupField::LogoMode => self.toggle_logo_mode(),
+            SetupField::LogoQuality => self.prev_logo_quality(),
+        }
+    }
+
     pub fn toggle_language(&mut self) {
         self.language = self.language.toggle();
-        if let Err(err) = super::config::save_language_preference(self.language) {
-            self.set_status(StatusLevel::Warn, format!("Failed to save language: {err}"));
+        self.system_overview_snapshot = None;
+        if let Err(err) = super::config::save_display_preferences(
+            self.language,
+            self.logo_mode,
+            self.logo_quality,
+        ) {
+            self.set_status(
+                StatusLevel::Warn,
+                format!("Failed to save display preferences: {err}"),
+            );
+        }
+    }
+
+    pub fn toggle_logo_mode(&mut self) {
+        self.logo_mode = self.logo_mode.toggle();
+        if let Some(cache) = self.logo_cache.as_mut() {
+            cache.rendered = None;
+        }
+        if let Err(err) = super::config::save_display_preferences(
+            self.language,
+            self.logo_mode,
+            self.logo_quality,
+        ) {
+            self.set_status(
+                StatusLevel::Warn,
+                format!("Failed to save display preferences: {err}"),
+            );
+        }
+    }
+
+    pub fn next_logo_quality(&mut self) {
+        self.set_logo_quality(self.logo_quality.next());
+    }
+
+    pub fn prev_logo_quality(&mut self) {
+        self.set_logo_quality(self.logo_quality.prev());
+    }
+
+    fn set_logo_quality(&mut self, value: LogoQuality) {
+        if self.logo_quality == value {
+            return;
+        }
+        self.logo_quality = value;
+        if let Some(cache) = self.logo_cache.as_mut() {
+            cache.rendered = None;
+        }
+        if let Err(err) = super::config::save_display_preferences(
+            self.language,
+            self.logo_mode,
+            self.logo_quality,
+        ) {
+            self.set_status(
+                StatusLevel::Warn,
+                format!("Failed to save display preferences: {err}"),
+            );
         }
     }
 
@@ -464,6 +674,30 @@ impl App {
 
     pub fn toggle_gpu_process_sort_dir(&mut self) {
         self.gpu_process_sort_dir = self.gpu_process_sort_dir.toggle();
+    }
+
+    pub fn next_system_tab(&mut self) {
+        self.system_tab = self.system_tab.next();
+    }
+
+    pub fn prev_system_tab(&mut self) {
+        self.system_tab = self.system_tab.prev();
+    }
+
+    pub fn set_system_tab(&mut self, tab: SystemTab) {
+        self.system_tab = tab;
+    }
+
+    pub fn system_tab_for_click(&self, column: u16, row: u16) -> Option<SystemTab> {
+        self.system_tab_regions
+            .iter()
+            .find(|region| {
+                row >= region.rect.y
+                    && row < region.rect.y.saturating_add(region.rect.height)
+                    && column >= region.rect.x
+                    && column < region.rect.x.saturating_add(region.rect.width)
+            })
+            .map(|region| region.tab)
     }
 
     pub fn selected_gpu_process_pid(&self) -> Option<u32> {

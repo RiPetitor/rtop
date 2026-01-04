@@ -11,7 +11,10 @@ pub fn handle_event(app: &mut App, event: AppEvent) -> EventResult {
         AppEvent::Key(key) => handle_key(app, key),
         AppEvent::Mouse(mouse) => handle_mouse(app, mouse),
         AppEvent::Tick => {
-            app.refresh();
+            app.tick();
+            if app.view_mode != ViewMode::SystemInfo {
+                app.refresh();
+            }
             EventResult::Continue
         }
         AppEvent::Resize(_, _) => {
@@ -124,7 +127,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
             EventResult::Continue
         }
         KeyCode::Left => {
-            if app.view_mode == ViewMode::GpuFocus {
+            if app.view_mode == ViewMode::SystemInfo {
+                app.prev_system_tab();
+            } else if app.view_mode == ViewMode::GpuFocus {
                 app.set_gpu_process_sort_key(app.gpu_process_sort_key.prev());
             } else {
                 app.set_sort_key(app.sort_key.prev());
@@ -132,7 +137,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
             EventResult::Continue
         }
         KeyCode::Right => {
-            if app.view_mode == ViewMode::GpuFocus {
+            if app.view_mode == ViewMode::SystemInfo {
+                app.next_system_tab();
+            } else if app.view_mode == ViewMode::GpuFocus {
                 app.set_gpu_process_sort_key(app.gpu_process_sort_key.next());
             } else {
                 app.set_sort_key(app.sort_key.next());
@@ -206,6 +213,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
         }
         KeyCode::Char('r') | KeyCode::Char('к') => {
             app.refresh();
+            if app.view_mode == ViewMode::SystemInfo {
+                app.system_overview_snapshot = None;
+                app.logo_cache = None;
+            }
             EventResult::Continue
         }
         KeyCode::Char('g') | KeyCode::Char('п') => {
@@ -242,6 +253,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
                 app.toggle_processes_focus();
             } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
                 app.toggle_gpu_focus_panel();
+            } else if app.view_mode == ViewMode::SystemInfo {
+                app.next_system_tab();
             }
             // View switching is done with number keys (1-5)
             EventResult::Continue
@@ -251,6 +264,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
                 app.toggle_processes_focus();
             } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
                 app.toggle_gpu_focus_panel();
+            } else if app.view_mode == ViewMode::SystemInfo {
+                app.prev_system_tab();
             }
             EventResult::Continue
         }
@@ -290,8 +305,24 @@ fn handle_setup_key(app: &mut App, key: KeyEvent) -> EventResult {
             app.toggle_setup();
             EventResult::Continue
         }
-        KeyCode::Left | KeyCode::Right | KeyCode::Enter | KeyCode::Char(' ') => {
-            app.toggle_language();
+        KeyCode::Up => {
+            app.prev_setup_field();
+            EventResult::Continue
+        }
+        KeyCode::Down => {
+            app.next_setup_field();
+            EventResult::Continue
+        }
+        KeyCode::Left => {
+            app.prev_setup_value();
+            EventResult::Continue
+        }
+        KeyCode::Right => {
+            app.next_setup_value();
+            EventResult::Continue
+        }
+        KeyCode::Enter | KeyCode::Char(' ') => {
+            app.next_setup_value();
             EventResult::Continue
         }
         _ => EventResult::Continue,
@@ -333,6 +364,22 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) -> EventResult {
                     app.set_gpu_process_sort_key(key);
                 }
                 return EventResult::Continue;
+            }
+
+            if app.view_mode == ViewMode::SystemInfo {
+                if let Some(rect) = app.system_update_region
+                    && rect_contains(rect, mouse.column, mouse.row)
+                {
+                    app.refresh();
+                    app.system_overview_snapshot = None;
+                    app.logo_cache = None;
+                    return EventResult::Continue;
+                }
+
+                if let Some(tab) = app.system_tab_for_click(mouse.column, mouse.row) {
+                    app.set_system_tab(tab);
+                    return EventResult::Continue;
+                }
             }
 
             if let Some(body) = app.process_body

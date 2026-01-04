@@ -6,6 +6,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use super::state::Language;
+use super::{LogoMode, LogoQuality};
 use crate::data::{GpuPreference, SortDir, SortKey};
 
 const MIN_TICK_MS: u64 = 100;
@@ -20,6 +21,8 @@ pub struct Config {
     pub gpu_pref: GpuPreference,
     pub gpu_poll_rate: Duration,
     pub language: Language,
+    pub logo_mode: LogoMode,
+    pub logo_quality: LogoQuality,
 }
 
 /// File-based configuration (TOML)
@@ -54,6 +57,8 @@ struct DisplayConfig {
     sort_dir: String,
     gpu_preference: String,
     language: String,
+    logo_mode: String,
+    logo_quality: String,
 }
 
 impl Default for DisplayConfig {
@@ -64,6 +69,8 @@ impl Default for DisplayConfig {
             sort_dir: String::new(),
             gpu_preference: "auto".to_string(),
             language: "en".to_string(),
+            logo_mode: "ascii".to_string(),
+            logo_quality: "medium".to_string(),
         }
     }
 }
@@ -94,6 +101,9 @@ impl Config {
         let mut gpu_pref = GpuPreference::parse(&file_config.display.gpu_preference)
             .unwrap_or(GpuPreference::Auto);
         let language = Language::parse(&file_config.display.language).unwrap_or(Language::English);
+        let logo_mode = LogoMode::parse(&file_config.display.logo_mode).unwrap_or(LogoMode::Ascii);
+        let logo_quality =
+            LogoQuality::parse(&file_config.display.logo_quality).unwrap_or(LogoQuality::Medium);
 
         // Override with CLI args
         let mut args = env::args().skip(1);
@@ -148,6 +158,8 @@ impl Config {
             gpu_pref,
             gpu_poll_rate: Duration::from_millis(gpu_poll_ms),
             language,
+            logo_mode,
+            logo_quality,
         })
     }
 }
@@ -172,11 +184,78 @@ fn load_config_file() -> Result<Option<FileConfig>, String> {
     };
     match toml::from_str(&content) {
         Ok(config) => Ok(Some(config)),
-        Err(err) => Err(format!(
-            "Failed to parse config file {}: {err}",
-            path.display()
-        )),
+        Err(_) => {
+            if !content.trim().is_empty() {
+                let backup = path.with_extension("toml.bak");
+                let _ = fs::write(&backup, &content);
+            }
+            Ok(None)
+        }
     }
+}
+
+fn load_config_root(path: &PathBuf) -> Result<toml::Value, String> {
+    if !path.exists() {
+        return Ok(toml::Value::Table(Default::default()));
+    }
+    let content = fs::read_to_string(path)
+        .map_err(|err| format!("Failed to read config file {}: {err}", path.display()))?;
+    match content.parse::<toml::Value>() {
+        Ok(value) => Ok(value),
+        Err(_) => {
+            if !content.trim().is_empty() {
+                let backup = path.with_extension("toml.bak");
+                let _ = fs::write(&backup, &content);
+            }
+            Ok(toml::Value::Table(Default::default()))
+        }
+    }
+}
+
+pub fn save_display_preferences(
+    language: Language,
+    logo_mode: LogoMode,
+    logo_quality: LogoQuality,
+) -> Result<(), String> {
+    let Some(path) = config_path() else {
+        return Err("Config path unavailable".to_string());
+    };
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Failed to create config directory: {err}"))?;
+    }
+
+    let mut root = load_config_root(&path)?;
+    let table = root
+        .as_table_mut()
+        .ok_or_else(|| format!("Config file {} has invalid format", path.display()))?;
+    let display = table
+        .entry("display".to_string())
+        .or_insert_with(|| toml::Value::Table(Default::default()));
+    let display_table = display.as_table_mut().ok_or_else(|| {
+        format!(
+            "Config file {} has invalid [display] section",
+            path.display()
+        )
+    })?;
+    display_table.insert(
+        "language".to_string(),
+        toml::Value::String(language.code().to_string()),
+    );
+    display_table.insert(
+        "logo_mode".to_string(),
+        toml::Value::String(logo_mode.code().to_string()),
+    );
+    display_table.insert(
+        "logo_quality".to_string(),
+        toml::Value::String(logo_quality.code().to_string()),
+    );
+
+    let output = toml::to_string_pretty(&root)
+        .map_err(|err| format!("Failed to serialize config: {err}"))?;
+    fs::write(&path, output)
+        .map_err(|err| format!("Failed to write config file {}: {err}", path.display()))?;
+    Ok(())
 }
 
 fn usage() -> String {
@@ -208,56 +287,10 @@ fn usage() -> String {
         "  sort_dir = \"desc\"",
         "  gpu_preference = \"auto\"",
         "  language = \"en\"",
+        "  logo_mode = \"ascii\"",
+        "  logo_quality = \"medium\"",
     ]
     .join("\n")
-}
-
-pub fn save_language_preference(language: Language) -> Result<(), String> {
-    let Some(path) = config_path() else {
-        return Err("Config path unavailable".to_string());
-    };
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|err| format!("Failed to create config directory: {err}"))?;
-    }
-
-    let mut root = if path.exists() {
-        match fs::read_to_string(&path) {
-            Ok(content) => content
-                .parse::<toml::Value>()
-                .map_err(|err| {
-                    format!("Failed to parse config file {}: {err}", path.display())
-                })?,
-            Err(err) => {
-                return Err(format!(
-                    "Failed to read config file {}: {err}",
-                    path.display()
-                ));
-            }
-        }
-    } else {
-        toml::Value::Table(Default::default())
-    };
-
-    let table = root
-        .as_table_mut()
-        .ok_or_else(|| format!("Config file {} has invalid format", path.display()))?;
-    let display = table
-        .entry("display".to_string())
-        .or_insert_with(|| toml::Value::Table(Default::default()));
-    let display_table = display
-        .as_table_mut()
-        .ok_or_else(|| format!("Config file {} has invalid [display] section", path.display()))?;
-    display_table.insert(
-        "language".to_string(),
-        toml::Value::String(language.code().to_string()),
-    );
-
-    let output = toml::to_string_pretty(&root)
-        .map_err(|err| format!("Failed to serialize config: {err}"))?;
-    fs::write(&path, output)
-        .map_err(|err| format!("Failed to write config file {}: {err}", path.display()))?;
-    Ok(())
 }
 
 fn normalize_tick_ms(value: u64) -> u64 {
@@ -286,6 +319,7 @@ mod tests {
         assert!(config.display.show_vram);
         assert_eq!(config.display.default_sort, "cpu");
         assert_eq!(config.display.language, "en");
+        assert_eq!(config.display.logo_quality, "medium");
     }
 
     #[test]
@@ -300,5 +334,6 @@ mod tests {
         assert_eq!(config.general.tick_rate_ms, DEFAULT_TICK_MS);
         assert_eq!(config.display.default_sort, "mem");
         assert_eq!(config.display.language, "en");
+        assert_eq!(config.display.logo_quality, "medium");
     }
 }
