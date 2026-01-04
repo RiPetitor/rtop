@@ -18,7 +18,7 @@ Terminal system monitor for Linux with GPU and container support.
 - **GPU** — NVIDIA (nvidia-smi), AMD/Intel (sysfs/lspci)
 - **GPU processes** — per-process load/VRAM (nvidia-smi, DRM fdinfo)
 - **VRAM** — realtime GPU memory usage
-- **System tab** — extended info + colored ASCII logo
+- **System tab** — extended info
 - **Containers** — list, net rate and drill-down into processes
 - **Setup/Help** — modal windows (F2/F12) + language toggle (EN/RU)
 
@@ -105,10 +105,41 @@ default_sort = "cpu"
 sort_dir = "desc"
 gpu_preference = "auto"
 language = "en"
+logo_mode = "ascii"
+logo_quality = "medium"
 ```
 
 CLI args override the config.
-Language is saved to the config when toggled in Setup (`en` / `ru`).
+Display settings are saved to the config when toggled in Setup (language, logo mode, logo quality).
+
+Display options:
+- `logo_mode`: `ascii` or `svg`
+- `logo_quality`: `quality` (Smoothed), `medium` (Medium), `pixel` (Detailed)
+
+### Custom logo
+
+1. Create folders:
+   - `~/.config/rtop/logo/ascii/`
+   - `~/.config/rtop/logo/svg/`
+2. Put your logo file in one of the folders.
+   - The first file in alphabetical order is used.
+   - ASCII: any text file, colors via `$1..$9`, reset with `$0`, literal `$` with `$$`.
+3. Optional palette file in `~/.config/rtop/logo/`:
+   - `palette.json`, `palette.yaml`, or `palette.yml`
+   - RGB values are 0-255.
+
+Example `palette.json`:
+
+```json
+{
+  "default": [255, 255, 255],
+  "colors": [
+    [78, 190, 210],
+    [230, 180, 70],
+    [230, 90, 70]
+  ]
+}
+```
 
 ### Architecture
 
@@ -136,10 +167,6 @@ rtop uses multiple sources:
 Results are merged with nvidia-smi priority for NVIDIA.
 GPU processes use `nvidia-smi pmon` and `/proc/*/fdinfo` (DRM).
 
-### ASCII logos
-
-Docs for adding logos: `docs/ASCII_LOGOS.md`.
-
 ### Dependencies
 
 - [ratatui](https://github.com/ratatui-org/ratatui) — TUI framework
@@ -164,7 +191,7 @@ MIT
 - **GPU** — NVIDIA (nvidia-smi), AMD/Intel (sysfs/lspci)
 - **GPU процессы** — загрузка/VRAM по процессам (nvidia-smi, DRM fdinfo)
 - **VRAM** — использование памяти видеокарты в реальном времени
-- **Системная вкладка** — расширенная информация + цветной ASCII‑логотип
+- **Системная вкладка** — расширенная информация
 - **Контейнеры** — список контейнеров, net‑rate и drill‑down в процессы
 - **Setup/Help** — модальные окна (F2/F12) + переключение языка (EN/RU)
 
@@ -251,10 +278,41 @@ default_sort = "cpu"
 sort_dir = "desc"
 gpu_preference = "auto"
 language = "en"
+logo_mode = "ascii"
+logo_quality = "medium"
 ```
 
 CLI‑аргументы имеют приоритет над конфигом.
-Язык сохраняется в конфиге при переключении в Setup (`en` / `ru`).
+Параметры отображения сохраняются в конфиге при переключении в Setup (язык, режим лого, качество лого).
+
+Опции отображения:
+- `logo_mode`: `ascii` или `svg`
+- `logo_quality`: `quality` (Сглаженный), `medium` (Средне), `pixel` (Детальный)
+
+### Свой логотип
+
+1. Создайте папки:
+   - `~/.config/rtop/logo/ascii/`
+   - `~/.config/rtop/logo/svg/`
+2. Положите файл логотипа в нужную папку.
+   - Берётся первый файл по алфавиту.
+   - ASCII: любой текстовый файл, цвета через `$1..$9`, сброс `$0`, литерал `$` - `$$`.
+3. (Опционально) палитра в `~/.config/rtop/logo/`:
+   - `palette.json`, `palette.yaml`, или `palette.yml`
+   - RGB значения 0-255.
+
+Пример `palette.json`:
+
+```json
+{
+  "default": [255, 255, 255],
+  "colors": [
+    [78, 190, 210],
+    [230, 180, 70],
+    [230, 90, 70]
+  ]
+}
+```
 
 ### Архитектура
 
@@ -281,10 +339,6 @@ rtop использует несколько источников:
 
 Результаты объединяются с приоритетом nvidia-smi для NVIDIA.
 Для GPU процессов используются `nvidia-smi pmon` и `/proc/*/fdinfo` (DRM).
-
-### ASCII‑логотипы
-
-Документация для добавления логотипов: `docs/ASCII_LOGOS.md`.
 
 ### Зависимости
 
