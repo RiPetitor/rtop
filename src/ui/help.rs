@@ -166,8 +166,8 @@ pub fn render(frame: &mut Frame, app: &App) {
         hint_style,
     ));
     lines.push(make_row(
-        "5",
-        tr(app.language, "Processes", "Процессы"),
+        "Tab",
+        tr(app.language, "Switch panel", "Сменить панель"),
         "t/е",
         tr(app.language, "Tree view", "Дерево"),
         col1,

@@ -78,7 +78,7 @@ Minimum terminal size: 60x22.
 | `h` | Highlight processes (user/non-root/GUI) |
 | `g` / `G` | Next/previous GPU |
 | `t` | Process tree (Processes/Overview only) |
-| `1` / `2` / `3` / `4` / `5` | Overview / System / GPU / Containers / Processes |
+| `1` / `2` / `3` / `4` | Overview / System / GPU / Containers |
 | `Tab` | Cycle views (Overview → Processes → GPU → System → Containers) |
 | `b` / `Esc` | Back from container drill-down |
 | `F2` | Setup |
@@ -273,7 +273,7 @@ rtop [options]
 | `h` | Подсветка процессов (user/non‑root/GUI) |
 | `g` / `G` | Следующий/предыдущий GPU |
 | `t` | Дерево процессов (только в Processes/Overview) |
-| `1` / `2` / `3` / `4` / `5` | Обзор / Система / GPU / Контейнеры / Процессы |
+| `1` / `2` / `3` / `4` | Обзор / Система / GPU / Контейнеры |
 | `Tab` | Циклическое переключение вкладок (Обзор → Процессы → GPU → Система → Контейнеры) |
 | `b` / `Esc` | Назад из контейнерного drill‑down |
 | `F2` | Setup |
