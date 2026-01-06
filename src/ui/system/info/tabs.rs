@@ -1,13 +1,14 @@
 use std::cmp::Ordering;
 
-use ratatui::prelude::Style;
-use ratatui::text::Line;
+use ratatui::prelude::{Color, Style};
+use ratatui::text::{Line, Span};
 use sysinfo::LoadAvg;
 
 use crate::app::App;
+use crate::data::cpu::CpuDetails;
 use crate::data::{cpu_caches, cpu_details, lookup_cpu_codename};
 use crate::ui::text::tr;
-use crate::utils::{format_bytes, percent};
+use crate::utils::{format_bytes, percent, text_width};
 
 use super::layout::{push_header, push_line};
 
@@ -35,6 +36,31 @@ pub(super) fn push_cpu(
     let caches = cpu_caches();
     let codename = lookup_cpu_codename(&details.vendor_id, details.family, details.model);
     let na = tr(app.language, "N/A", "Н/Д");
+    let is_root = CpuDetails::is_root();
+
+    // Collect all labels to calculate max width
+    let labels = [
+        tr(app.language, "Name", "Имя"),
+        tr(app.language, "Code Name", "Код. имя"),
+        tr(app.language, "Package", "Сокет"),
+        tr(app.language, "Technology", "Техпроц."),
+        tr(app.language, "Specification", "Специфик."),
+        tr(app.language, "Instructions", "Инструкции"),
+        tr(app.language, "Core Speed", "Скор. ядра"),
+        tr(app.language, "Bus Speed", "Шина"),
+        tr(app.language, "Multiplier", "Множитель"),
+        tr(app.language, "Cores", "Ядра"),
+        tr(app.language, "Usage", "Загр."),
+        tr(app.language, "Load", "Нагрузка"),
+        "L1 Data",
+        "L2",
+        "L3",
+    ];
+
+    // Calculate max label width
+    let max_label_width = labels.iter().map(|s| text_width(s)).max().unwrap_or(12) + 2; // Add padding
+
+    let label_width = max_label_width.min(layout.width / 3);
 
     // Section: Processor
     push_header(
@@ -50,7 +76,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Name", "Имя"),
         cpu_brand.to_string(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -62,7 +88,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Code Name", "Код. имя"),
         codename_str.to_string(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -74,7 +100,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Package", "Сокет"),
         package_str.to_string(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -86,7 +112,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Technology", "Техпроц."),
         tech_str.to_string(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -97,7 +123,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Specification", "Специфик."),
         details.family_model_stepping(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -110,7 +136,7 @@ pub(super) fn push_cpu(
             tr(app.language, "Instructions", "Инструкции"),
             instructions.join(", "),
             layout.width,
-            layout.label_width,
+            label_width,
             layout.label_style,
             layout.value_style,
         );
@@ -130,7 +156,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Core Speed", "Скор. ядра"),
         cpu_freq.to_string(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -141,7 +167,24 @@ pub(super) fn push_cpu(
         tr(app.language, "Bus Speed", "Шина"),
         "100.00 MHz".to_string(),
         layout.width,
-        layout.label_width,
+        label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    // Multiplier
+    let multiplier_value = if is_root {
+        // TODO: Read actual multiplier from MSR when running as root
+        tr(app.language, "N/A (MSR)", "Н/Д (MSR)").to_string()
+    } else {
+        tr(app.language, "need root", "нужен root").to_string()
+    };
+    push_line(
+        lines,
+        tr(app.language, "Multiplier", "Множитель"),
+        multiplier_value,
+        layout.width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -159,7 +202,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Cores", "Ядра"),
         cpu_cores.to_string(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -169,7 +212,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Usage", "Загр."),
         format!("{cpu_usage:.1}%"),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -179,7 +222,7 @@ pub(super) fn push_cpu(
         tr(app.language, "Load", "Нагрузка"),
         format!("{:.2} {:.2} {:.2}", load.one, load.five, load.fifteen),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -197,7 +240,7 @@ pub(super) fn push_cpu(
         "L1 Data",
         caches.format_l1(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -207,7 +250,7 @@ pub(super) fn push_cpu(
         "L2",
         caches.format_l2(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
@@ -217,10 +260,23 @@ pub(super) fn push_cpu(
         "L3",
         caches.format_l3(),
         layout.width,
-        layout.label_width,
+        label_width,
         layout.label_style,
         layout.value_style,
     );
+
+    // Root access hint
+    if !is_root {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            tr(
+                app.language,
+                "Run as root for more details (voltage, multiplier)",
+                "Запустите от root для деталей (напряжение, множитель)",
+            ),
+            Style::default().fg(Color::Yellow),
+        )));
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
