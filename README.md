@@ -2,7 +2,7 @@
 
 [EN](#english) | [RU](#ru)
 
-![Rust](https://img.shields.io/badge/Rust-1.85+-orange?logo=rust)
+![Rust](https://img.shields.io/badge/Rust-1.88+-orange?logo=rust)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux-green)
 
@@ -14,7 +14,7 @@ Terminal system monitor for Linux with GPU and container support.
 ### Features
 
 - **Processes** — CPU, memory, uptime, status + process tree
-- **Sorting and filters** — hotkeys + mouse column sorting
+- **Sorting** — hotkeys + mouse column sorting + process highlighting
 - **GPU** — NVIDIA (nvidia-smi), AMD/Intel (sysfs/lspci)
 - **GPU processes** — per-process load/VRAM (nvidia-smi, DRM fdinfo)
 - **VRAM** — realtime GPU memory usage
@@ -24,7 +24,7 @@ Terminal system monitor for Linux with GPU and container support.
 
 ### Installation
 
-Requires Rust 1.85+.
+Requires Rust 1.88+.
 
 ```bash
 # Clone and build
@@ -209,7 +209,7 @@ MIT
 ### Возможности
 
 - **Процессы** — CPU, память, аптайм, статус + дерево процессов
-- **Сортировка и фильтры** — быстрые клавиши + клики мышью по заголовкам
+- **Сортировка** — быстрые клавиши + клики мышью по заголовкам + подсветка процессов
 - **GPU** — NVIDIA (nvidia-smi), AMD/Intel (sysfs/lspci)
 - **GPU процессы** — загрузка/VRAM по процессам (nvidia-smi, DRM fdinfo)
 - **VRAM** — использование памяти видеокарты в реальном времени
@@ -219,7 +219,7 @@ MIT
 
 ### Установка
 
-Требуется Rust 1.85+.
+Требуется Rust 1.88+.
 
 ```bash
 # Clone and build
