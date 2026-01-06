@@ -4,6 +4,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
 use super::text::tr;
 use super::theme::{COLOR_ACCENT, COLOR_BORDER, COLOR_MUTED};
+use super::widgets::centered_rect;
 use crate::app::{App, IconMode, Language, LogoMode, LogoQuality, SetupField};
 
 pub fn render(frame: &mut Frame, app: &App) {
@@ -187,26 +188,4 @@ pub fn render(frame: &mut Frame, app: &App) {
     let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: true });
 
     frame.render_widget(paragraph, area);
-}
-
-fn centered_rect(percent_x: u16, percent_y: u16, rect: Rect) -> Rect {
-    let vertical = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(rect);
-
-    let horizontal = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(vertical[1]);
-
-    horizontal[1]
 }
