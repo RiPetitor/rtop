@@ -19,10 +19,10 @@ pub fn motherboard_summary() -> Option<String> {
             let vendor = board.vendor_name().filter(|value| !value.trim().is_empty());
             let version = board.version().filter(|value| !value.trim().is_empty());
             let mut line = name.or(vendor)?;
-            if let Some(version) = version {
-                if !line.contains(&version) {
-                    line = format!("{line} ({version})");
-                }
+            if let Some(version) = version
+                && !line.contains(&version)
+            {
+                line = format!("{line} ({version})");
             }
             Some(line)
         })
@@ -91,7 +91,7 @@ fn read_cpu_passport_freq_range() -> Option<(u64, u64)> {
 
 fn read_khz(path: PathBuf) -> Option<u64> {
     let content = fs::read_to_string(path).ok()?;
-    let value = content.trim().split_whitespace().next()?;
+    let value = content.split_whitespace().next()?;
     let parsed = value.parse::<u64>().ok()?;
     if parsed == 0 { None } else { Some(parsed) }
 }
@@ -352,7 +352,7 @@ fn display_from_drm() -> Option<DisplayInfo> {
         let size_in = fs::read(path.join("edid"))
             .ok()
             .and_then(|data| edid_size_inches(&data));
-        let connector = name.splitn(2, '-').nth(1).unwrap_or(name.as_str());
+        let connector = name.split_once('-').map(|x| x.1).unwrap_or(name.as_str());
         return Some(DisplayInfo {
             width,
             height,
@@ -434,10 +434,10 @@ fn mouse_name_inner() -> Option<String> {
                 handlers = Some(value.to_string());
             }
         }
-        if let (Some(name), Some(handlers)) = (name, handlers) {
-            if handlers.contains("mouse") {
-                candidates.push(name);
-            }
+        if let (Some(name), Some(handlers)) = (name, handlers)
+            && handlers.contains("mouse")
+        {
+            candidates.push(name);
         }
     }
     choose_mouse(candidates)

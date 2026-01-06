@@ -302,7 +302,7 @@ pub fn short_device_name(device: &str) -> String {
             let rest = &device[pos..];
             // Take until end of model word/number
             let end = rest
-                .find(|c: char| c == '[' || c == '(' || c == ',')
+                .find(|c| ['[', '(', ','].contains(&c))
                 .unwrap_or(rest.len());
             return rest[..end].trim().to_string();
         }

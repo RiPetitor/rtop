@@ -27,13 +27,10 @@ pub fn render(frame: &mut Frame, app: &App) {
     let col1 = 14; // Key column
     let col2 = 24; // Description column
 
-    let mut lines = Vec::new();
-
-    // Section: Quick Keys
-    lines.push(Line::from(Span::styled(
+    let mut lines = vec![Line::from(Span::styled(
         tr(app.language, "Quick Keys", "Быстрые клавиши"),
         label_style,
-    )));
+    ))];
     lines.push(make_row(
         "F2",
         tr(app.language, "Setup", "Настройки"),

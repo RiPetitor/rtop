@@ -7,7 +7,6 @@ use super::types::GpuProcessUsage;
 
 const MIN_SAMPLE_INTERVAL: Duration = Duration::from_millis(500);
 
-
 type ProcessKey = (String, u32);
 
 pub struct DrmProcessTracker {
@@ -35,10 +34,10 @@ impl DrmProcessTracker {
 
     pub fn sample_processes(&mut self) -> Vec<GpuProcessUsage> {
         let now = Instant::now();
-        if let Some(last) = self.last_instant {
-            if now.duration_since(last) < self.min_interval {
-                return self.last_output.clone();
-            }
+        if let Some(last) = self.last_instant
+            && now.duration_since(last) < self.min_interval
+        {
+            return self.last_output.clone();
         }
 
         let current = collect_drm_process_counters();

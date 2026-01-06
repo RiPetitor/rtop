@@ -107,13 +107,13 @@ fn detect_mesa_version() -> Option<String> {
     #[cfg(target_os = "linux")]
     {
         static VERSION: OnceLock<Option<String>> = OnceLock::new();
-        return VERSION
+        VERSION
             .get_or_init(|| {
                 mesa_version_from_files()
                     .or_else(mesa_version_from_pkgconfig)
                     .or_else(mesa_version_from_glxinfo)
             })
-            .clone();
+            .clone()
     }
 
     #[cfg(not(target_os = "linux"))]

@@ -16,60 +16,59 @@ fn package_summary_inner() -> Option<String> {
     let timeout = Duration::from_secs(2);
 
     // RPM-based (Fedora, RHEL, openSUSE) - exclude gpg-pubkey packages
-    if let Some(count) = count_rpm(timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (rpm)"));
-        }
+    if let Some(count) = count_rpm(timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (rpm)"));
     }
     // Debian-based (Debian, Ubuntu)
     if let Some(count) =
         count_command_lines("dpkg-query", &["-f", "${binary:Package}\\n", "-W"], timeout)
+        && count > 0
     {
-        if count > 0 {
-            parts.push(format!("{count} (dpkg)"));
-        }
+        parts.push(format!("{count} (dpkg)"));
     }
     // Arch-based
-    if let Some(count) = count_command_lines("pacman", &["-Qq"], timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (pacman)"));
-        }
+    if let Some(count) = count_command_lines("pacman", &["-Qq"], timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (pacman)"));
     }
     // Gentoo
-    if let Some(count) = count_portage() {
-        if count > 0 {
-            parts.push(format!("{count} (portage)"));
-        }
+    if let Some(count) = count_portage()
+        && count > 0
+    {
+        parts.push(format!("{count} (portage)"));
     }
     // Void Linux
-    if let Some(count) = count_command_lines("xbps-query", &["-l"], timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (xbps)"));
-        }
+    if let Some(count) = count_command_lines("xbps-query", &["-l"], timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (xbps)"));
     }
     // Alpine Linux
-    if let Some(count) = count_apk(timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (apk)"));
-        }
+    if let Some(count) = count_apk(timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (apk)"));
     }
     // Solus
-    if let Some(count) = count_command_lines("eopkg", &["li"], timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (eopkg)"));
-        }
+    if let Some(count) = count_command_lines("eopkg", &["li"], timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (eopkg)"));
     }
     // NixOS / Nix
-    if let Some(count) = count_nix(timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (nix)"));
-        }
+    if let Some(count) = count_nix(timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (nix)"));
     }
     // Flatpak (all packages including runtimes)
-    if let Some(count) = count_flatpak(timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (flatpak)"));
-        }
+    if let Some(count) = count_flatpak(timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (flatpak)"));
     }
     // Snap
     if let Some(count) = count_command_lines("snap", &["list"], timeout) {
@@ -79,15 +78,15 @@ fn package_summary_inner() -> Option<String> {
         }
     }
     // Homebrew (macOS/Linux)
-    if let Some(count) = count_command_lines("brew", &["list", "--formula"], timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (brew)"));
-        }
+    if let Some(count) = count_command_lines("brew", &["list", "--formula"], timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (brew)"));
     }
-    if let Some(count) = count_command_lines("brew", &["list", "--cask"], timeout) {
-        if count > 0 {
-            parts.push(format!("{count} (brew-cask)"));
-        }
+    if let Some(count) = count_command_lines("brew", &["list", "--cask"], timeout)
+        && count > 0
+    {
+        parts.push(format!("{count} (brew-cask)"));
     }
 
     if parts.is_empty() {

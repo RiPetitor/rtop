@@ -41,11 +41,9 @@ impl App {
                 if entry.netns_id.is_none() {
                     if let Some(netns_id) = self.container_netns_cache.get(&key).copied() {
                         entry.netns_id = Some(netns_id);
-                    } else if needs_net_sample {
-                        if let Some(netns_id) = netns_id_for_pid(pid) {
-                            entry.netns_id = Some(netns_id);
-                            self.container_netns_cache.insert(key.clone(), netns_id);
-                        }
+                    } else if needs_net_sample && let Some(netns_id) = netns_id_for_pid(pid) {
+                        entry.netns_id = Some(netns_id);
+                        self.container_netns_cache.insert(key.clone(), netns_id);
                     }
                     if let Some(netns_id) = entry.netns_id {
                         *netns_container_counts.entry(netns_id).or_insert(0) += 1;
