@@ -323,6 +323,13 @@ mod tests {
     }
 
     #[test]
+    fn normalize_gpu_poll_ms_clamps_to_min() {
+        assert_eq!(normalize_gpu_poll_ms(0), MIN_TICK_MS);
+        assert_eq!(normalize_gpu_poll_ms(MIN_TICK_MS), MIN_TICK_MS);
+        assert_eq!(normalize_gpu_poll_ms(5000), 5000);
+    }
+
+    #[test]
     fn file_config_defaults() {
         let config: FileConfig = toml::from_str("").unwrap();
         assert_eq!(config.general.tick_rate_ms, DEFAULT_TICK_MS);
@@ -345,5 +352,180 @@ mod tests {
         assert_eq!(config.display.default_sort, "mem");
         assert_eq!(config.display.language, "en");
         assert_eq!(config.display.logo_quality, "medium");
+    }
+
+    #[test]
+    fn file_config_full() {
+        let config: FileConfig = toml::from_str(
+            r#"
+            [general]
+            tick_rate_ms = 500
+            gpu_poll_ms = 1500
+
+            [display]
+            show_vram = false
+            default_sort = "mem"
+            sort_dir = "asc"
+            gpu_preference = "discrete"
+            language = "ru"
+            icon_mode = "nerd"
+            logo_mode = "svg"
+            logo_quality = "quality"
+            "#,
+        )
+        .unwrap();
+        assert_eq!(config.general.tick_rate_ms, 500);
+        assert_eq!(config.general.gpu_poll_ms, 1500);
+        assert!(!config.display.show_vram);
+        assert_eq!(config.display.default_sort, "mem");
+        assert_eq!(config.display.sort_dir, "asc");
+        assert_eq!(config.display.gpu_preference, "discrete");
+        assert_eq!(config.display.language, "ru");
+        assert_eq!(config.display.icon_mode, "nerd");
+        assert_eq!(config.display.logo_mode, "svg");
+        assert_eq!(config.display.logo_quality, "quality");
+    }
+
+    #[test]
+    fn file_config_invalid_section_ignored() {
+        let config: FileConfig = toml::from_str(
+            r#"
+            [unknown_section]
+            key = "value"
+            "#,
+        )
+        .unwrap();
+        assert_eq!(config.general.tick_rate_ms, DEFAULT_TICK_MS);
+    }
+
+    #[test]
+    fn file_config_sort_key_options() {
+        for key in &["pid", "user", "cpu", "mem", "uptime", "stat", "name"] {
+            let config: FileConfig = toml::from_str(&format!(
+                r#"
+                [display]
+                default_sort = "{}"
+                "#,
+                key
+            ))
+            .unwrap();
+            assert_eq!(config.display.default_sort, *key);
+        }
+    }
+
+    #[test]
+    fn file_config_sort_dir_options() {
+        for dir in &["asc", "desc"] {
+            let config: FileConfig = toml::from_str(&format!(
+                r#"
+                [display]
+                sort_dir = "{}"
+                "#,
+                dir
+            ))
+            .unwrap();
+            assert_eq!(config.display.sort_dir, *dir);
+        }
+    }
+
+    #[test]
+    fn file_config_gpu_preference_options() {
+        for pref in &["auto", "discrete", "integrated"] {
+            let config: FileConfig = toml::from_str(&format!(
+                r#"
+                [display]
+                gpu_preference = "{}"
+                "#,
+                pref
+            ))
+            .unwrap();
+            assert_eq!(config.display.gpu_preference, *pref);
+        }
+    }
+
+    #[test]
+    fn file_config_language_options() {
+        for lang in &["en", "ru"] {
+            let config: FileConfig = toml::from_str(&format!(
+                r#"
+                [display]
+                language = "{}"
+                "#,
+                lang
+            ))
+            .unwrap();
+            assert_eq!(config.display.language, *lang);
+        }
+    }
+
+    #[test]
+    fn file_config_icon_mode_options() {
+        for mode in &["text", "nerd"] {
+            let config: FileConfig = toml::from_str(&format!(
+                r#"
+                [display]
+                icon_mode = "{}"
+                "#,
+                mode
+            ))
+            .unwrap();
+            assert_eq!(config.display.icon_mode, *mode);
+        }
+    }
+
+    #[test]
+    fn file_config_logo_mode_options() {
+        for mode in &["ascii", "svg"] {
+            let config: FileConfig = toml::from_str(&format!(
+                r#"
+                [display]
+                logo_mode = "{}"
+                "#,
+                mode
+            ))
+            .unwrap();
+            assert_eq!(config.display.logo_mode, *mode);
+        }
+    }
+
+    #[test]
+    fn file_config_logo_quality_options() {
+        for quality in &["quality", "medium", "pixel"] {
+            let config: FileConfig = toml::from_str(&format!(
+                r#"
+                [display]
+                logo_quality = "{}"
+                "#,
+                quality
+            ))
+            .unwrap();
+            assert_eq!(config.display.logo_quality, *quality);
+        }
+    }
+
+    #[test]
+    fn file_config_numeric_values() {
+        let config: FileConfig = toml::from_str(
+            r#"
+            [general]
+            tick_rate_ms = 100
+            gpu_poll_ms = 500
+            "#,
+        )
+        .unwrap();
+        assert_eq!(config.general.tick_rate_ms, 100);
+        assert_eq!(config.general.gpu_poll_ms, 500);
+    }
+
+    #[test]
+    fn file_config_boolean_values() {
+        let config: FileConfig = toml::from_str(
+            r#"
+            [display]
+            show_vram = false
+            "#,
+        )
+        .unwrap();
+        assert!(!config.display.show_vram);
     }
 }
