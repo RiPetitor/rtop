@@ -20,7 +20,7 @@ impl IconLabel {
 
 pub const ICON_USER: IconLabel = IconLabel::new("", "User:");
 pub const ICON_DISTRO: IconLabel = IconLabel::new("󱋩", "Distro:");
-pub const ICON_OS: IconLabel = IconLabel::new("󰣛", "OS:");
+pub const ICON_OS: IconLabel = IconLabel::new("󰪫", "OS:");
 pub const ICON_KERNEL: IconLabel = IconLabel::new("", "Kernel:");
 pub const ICON_UPTIME: IconLabel = IconLabel::new("󰅐", "Uptime:");
 pub const ICON_BOARD: IconLabel = IconLabel::new("󰾰", "Board:");
@@ -35,5 +35,5 @@ pub const ICON_WM: IconLabel = IconLabel::new("", "WM:");
 pub const ICON_SHELL: IconLabel = IconLabel::new("", "Shell:");
 pub const ICON_TERM: IconLabel = IconLabel::new("", "Term:");
 pub const ICON_PKG: IconLabel = IconLabel::new("󰏖", "Pkgs:");
-pub const ICON_SEP_NERD: &str = "";
-pub const ICON_IMMUTABLE: &str = "";
+pub const ICON_SEP_NERD: &str = "";
+pub const ICON_IMMUTABLE: &str = "󰣫";
