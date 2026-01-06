@@ -36,6 +36,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
     if app.show_help {
         return handle_help_key(app, key);
     }
+    if app.process_filter_active {
+        return handle_process_filter_input(app, key);
+    }
 
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => EventResult::Exit,
@@ -265,12 +268,56 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
             }
             EventResult::Continue
         }
+        KeyCode::Char('/') => {
+            if matches!(app.view_mode, ViewMode::Overview | ViewMode::Processes) {
+                app.process_filter_active = true;
+            }
+            EventResult::Continue
+        }
         KeyCode::Char('G') | KeyCode::Char('П') => {
             app.select_prev_gpu();
             EventResult::Continue
         }
         _ => EventResult::Continue,
     }
+}
+
+fn handle_process_filter_input(app: &mut App, key: KeyEvent) -> EventResult {
+    if key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('c') | KeyCode::Char('с'))
+    {
+        return EventResult::Exit;
+    }
+
+    match key.code {
+        KeyCode::Esc => {
+            if !app.process_filter.is_empty() {
+                app.process_filter.clear();
+                app.update_rows();
+            }
+            app.process_filter_active = false;
+        }
+        KeyCode::Enter => {
+            app.process_filter_active = false;
+        }
+        KeyCode::Backspace => {
+            if !app.process_filter.is_empty() {
+                app.process_filter.pop();
+                app.update_rows();
+            }
+        }
+        KeyCode::Char(ch) => {
+            if !key.modifiers.contains(KeyModifiers::CONTROL)
+                && !key.modifiers.contains(KeyModifiers::ALT)
+            {
+                app.process_filter.push(ch);
+                app.update_rows();
+            }
+        }
+        _ => {}
+    }
+
+    EventResult::Continue
 }
 
 fn handle_confirm_key(app: &mut App, key: KeyEvent) -> EventResult {

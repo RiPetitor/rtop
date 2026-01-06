@@ -92,6 +92,17 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(COLOR_ACCENT),
         ));
     }
+    if !app.process_filter.is_empty() {
+        first_line.push(Span::raw("  "));
+        first_line.push(Span::styled(
+            tr(app.language, "filter ", "фильтр "),
+            label_style,
+        ));
+        first_line.push(Span::styled(
+            app.process_filter.as_str(),
+            Style::default().fg(COLOR_ACCENT),
+        ));
+    }
 
     let lines = vec![
         Line::from(first_line),

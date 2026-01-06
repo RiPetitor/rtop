@@ -115,6 +115,13 @@ impl App {
             self.tree_labels.clear();
         }
 
+        let filter = self.process_filter.trim();
+        if !filter.is_empty() {
+            let needle = filter.to_lowercase();
+            self.rows
+                .retain(|row| row.name.to_lowercase().contains(&needle));
+        }
+
         // Clean up GUI cache for dead processes
         self.gui_process_cache
             .retain(|pid, _| current_pids.contains(pid));

@@ -83,6 +83,7 @@ pub struct App {
     pub sort_dir: SortDir,
     pub tree_view: bool,
     pub rows: Vec<ProcessRow>,
+    pub process_filter: String,
     pub selected_pid: Option<u32>,
     pub tree_labels: HashMap<u32, String>,
     gui_process_cache: HashMap<u32, bool>,
@@ -123,6 +124,7 @@ pub struct App {
     pub gpu_panel_expanded: bool,
     pub processes_focused: bool,
     pub processes_expanded: bool,
+    pub process_filter_active: bool,
     pub highlight_mode: HighlightMode,
 
     // Dialogs
@@ -183,6 +185,7 @@ impl App {
             sort_dir: config.sort_dir,
             tree_view: false,
             rows: Vec::new(),
+            process_filter: String::new(),
             selected_pid: None,
             tree_labels: HashMap::new(),
             gui_process_cache: HashMap::new(),
@@ -223,6 +226,7 @@ impl App {
             gpu_panel_expanded: false,
             processes_focused: false,
             processes_expanded: false,
+            process_filter_active: false,
             highlight_mode: HighlightMode::default(),
 
             // Dialogs
@@ -326,6 +330,7 @@ impl App {
         if mode != ViewMode::Processes && mode != ViewMode::Overview {
             self.container_filter = None;
             self.tree_view = false;
+            self.process_filter_active = false;
         }
         self.view_mode = mode;
     }
