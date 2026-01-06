@@ -4,17 +4,17 @@ use std::path::PathBuf;
 use resvg::tiny_skia;
 use resvg::usvg;
 
-use crate::app::{
-    LogoCell, LogoMode, LogoQuality, RenderedLogo, RgbColor, RgbaColor, SvgLogo,
-};
+use crate::app::{LogoCell, LogoMode, LogoQuality, RenderedLogo, RgbColor, RgbaColor, SvgLogo};
 
 const MAX_SVG_DIM: u32 = 2048;
 const ALPHA_THRESHOLD: u8 = 10;
 
 pub(super) fn load_svg_logo(path: PathBuf) -> Option<SvgLogo> {
     let data = fs::read(&path).ok()?;
-    let mut options = usvg::Options::default();
-    options.resources_dir = path.parent().map(|dir| dir.to_path_buf());
+    let options = usvg::Options {
+        resources_dir: path.parent().map(|dir| dir.to_path_buf()),
+        ..Default::default()
+    };
     let tree = usvg::Tree::from_data(&data, &options).ok()?;
     Some(SvgLogo { tree })
 }

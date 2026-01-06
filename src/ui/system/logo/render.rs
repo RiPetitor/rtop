@@ -26,7 +26,7 @@ pub fn render_logo(frame: &mut Frame, area: Rect, app: &mut App) {
         return;
     };
 
-    let needs_render = cache.rendered.as_ref().map_or(true, |rendered| {
+    let needs_render = cache.rendered.as_ref().is_none_or(|rendered| {
         rendered.mode != mode
             || rendered.quality != quality
             || rendered.width != area.width

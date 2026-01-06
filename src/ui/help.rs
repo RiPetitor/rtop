@@ -204,6 +204,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     frame.render_widget(paragraph, area);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_row(
     key1: &str,
     desc1: &str,

@@ -19,6 +19,7 @@ pub(super) struct TabLayout {
     pub section_style: Style,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn push_cpu(
     lines: &mut Vec<Line<'static>>,
     app: &App,
@@ -29,7 +30,12 @@ pub(super) fn push_cpu(
     cpu_usage: f32,
     load: LoadAvg,
 ) {
-    push_header(lines, tr(app.language, "CPU", "CPU"), layout.width, layout.section_style);
+    push_header(
+        lines,
+        tr(app.language, "CPU", "CPU"),
+        layout.width,
+        layout.section_style,
+    );
     push_line(
         lines,
         tr(app.language, "Model", "Модель"),
@@ -77,6 +83,7 @@ pub(super) fn push_cpu(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn push_memory(
     lines: &mut Vec<Line<'static>>,
     app: &App,
@@ -142,12 +149,7 @@ pub(super) fn push_memory(
     );
 }
 
-pub(super) fn push_disks(
-    lines: &mut Vec<Line<'static>>,
-    app: &App,
-    layout: TabLayout,
-    na: &str,
-) {
+pub(super) fn push_disks(lines: &mut Vec<Line<'static>>, app: &App, layout: TabLayout, na: &str) {
     push_header(
         lines,
         tr(app.language, "Disks", "Диски"),
@@ -271,9 +273,7 @@ pub(super) fn push_temps(lines: &mut Vec<Line<'static>>, app: &App, layout: TabL
         .collect::<Vec<_>>();
     temps.sort_by(
         |(a_label, a_temp), (b_label, b_temp)| match (a_temp, b_temp) {
-            (Some(a_temp), Some(b_temp)) => b_temp
-                .partial_cmp(a_temp)
-                .unwrap_or(Ordering::Equal),
+            (Some(a_temp), Some(b_temp)) => b_temp.partial_cmp(a_temp).unwrap_or(Ordering::Equal),
             (Some(_), None) => Ordering::Less,
             (None, Some(_)) => Ordering::Greater,
             (None, None) => a_label.cmp(b_label),

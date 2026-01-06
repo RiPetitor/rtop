@@ -44,7 +44,7 @@ fn render_info_body(frame: &mut Frame, area: Rect, app: &mut App) {
         .add_modifier(Modifier::BOLD);
     let sep_style = Style::default().fg(COLOR_MUTED);
     let width = area.width.max(1) as usize;
-    let label_width = width.min(12).max(6).min(width);
+    let label_width = width.clamp(6, 12);
 
     let unknown = tr(app.language, "unknown", "неизвестно");
     let na = tr(app.language, "n/a", "н/д");

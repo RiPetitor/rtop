@@ -4,7 +4,7 @@ use ratatui::text::{Line, Span};
 use crate::app::IconMode;
 use crate::utils::{fit_text, text_width};
 
-use super::icons::{IconLabel, ICON_SEP_NERD};
+use super::icons::{ICON_SEP_NERD, IconLabel};
 
 pub(super) fn push_header(lines: &mut Vec<Line<'static>>, title: &str, width: usize, style: Style) {
     let title = fit_text(title, width);
@@ -29,6 +29,7 @@ pub(super) fn push_line(
     ]));
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn push_icon_line(
     lines: &mut Vec<Line<'static>>,
     icon: &IconLabel,
