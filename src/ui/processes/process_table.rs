@@ -1,5 +1,6 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Cell, Row, Table, TableState};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Cell, Row, Table, TableState};
 
 use super::super::text::tr;
 use super::super::theme::{COLOR_ACCENT, COLOR_GOOD, COLOR_MUTED};
@@ -15,16 +16,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
 pub fn render_with_focus(frame: &mut Frame, area: Rect, app: &mut App, focused: bool) {
     let process_area = area;
     update_process_header_regions(app, process_area);
-    let panel_title = if app.tree_view {
-        tr(app.language, "Processes (Tree)", "Процессы (дерево)")
-    } else {
-        tr(app.language, "Processes", "Процессы")
-    };
-    let block = if focused {
-        panel_block_focused(panel_title)
-    } else {
-        panel_block(panel_title)
-    };
+    let block = process_block(app, focused);
     let inner = block.inner(process_area);
     app.process_body = if inner.width > 0 && inner.height > 1 {
         Some(Rect {
@@ -161,7 +153,7 @@ fn header_cell(app: &App, key: SortKey, label: &str) -> Cell<'static> {
 }
 
 fn update_process_header_regions(app: &mut App, area: Rect) {
-    let block = panel_block("Processes");
+    let block = process_block(app, false);
     let inner = block.inner(area);
     if inner.width == 0 || inner.height == 0 {
         app.process_header_regions.clear();
@@ -215,4 +207,64 @@ fn update_process_header_regions(app: &mut App, area: Rect) {
     }
 
     app.process_header_regions = regions;
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProcessTab {
+    List,
+    Filter,
+    Details,
+}
+
+fn process_block(app: &App, focused: bool) -> Block<'static> {
+    let block = if focused {
+        panel_block_focused("")
+    } else {
+        panel_block("")
+    };
+    block
+        .title(process_title_line(app))
+        .title_style(Style::default())
+}
+
+fn process_title_line(app: &App) -> Line<'static> {
+    let title_style = Style::default()
+        .fg(COLOR_ACCENT)
+        .add_modifier(Modifier::BOLD);
+    let inactive_style = Style::default().fg(COLOR_MUTED);
+    let separator_style = Style::default().fg(COLOR_MUTED);
+    let panel_title = if app.tree_view {
+        tr(app.language, "Processes (Tree)", "Процессы (дерево)")
+    } else {
+        tr(app.language, "Processes", "Процессы")
+    };
+    let active_tab = if app.process_filter_active || !app.process_filter.is_empty() {
+        ProcessTab::Filter
+    } else {
+        ProcessTab::List
+    };
+
+    let tabs = [
+        (ProcessTab::List, tr(app.language, "List", "Список")),
+        (ProcessTab::Filter, tr(app.language, "Filter", "Фильтр")),
+        (ProcessTab::Details, tr(app.language, "Details", "Детали")),
+    ];
+
+    let mut spans = Vec::new();
+    spans.push(Span::styled(format!(" {panel_title} "), title_style));
+    let separator = " | ";
+    spans.push(Span::styled(separator, separator_style));
+    for (idx, (tab, label)) in tabs.iter().enumerate() {
+        let style = if *tab == active_tab {
+            title_style
+        } else {
+            inactive_style
+        };
+        spans.push(Span::styled(format!(" {label} "), style));
+        if idx + 1 < tabs.len() {
+            spans.push(Span::styled(separator, separator_style));
+        }
+    }
+
+    Line::from(spans)
 }
