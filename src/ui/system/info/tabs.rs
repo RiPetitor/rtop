@@ -5,6 +5,7 @@ use ratatui::text::Line;
 use sysinfo::LoadAvg;
 
 use crate::app::App;
+use crate::data::{cpu_caches, cpu_details, lookup_cpu_codename};
 use crate::ui::text::tr;
 use crate::utils::{format_bytes, percent};
 
@@ -30,21 +31,129 @@ pub(super) fn push_cpu(
     cpu_usage: f32,
     load: LoadAvg,
 ) {
+    let details = cpu_details();
+    let caches = cpu_caches();
+    let codename = lookup_cpu_codename(&details.vendor_id, details.family, details.model);
+    let na = tr(app.language, "N/A", "Н/Д");
+
+    // Section: Processor
     push_header(
         lines,
-        tr(app.language, "CPU", "CPU"),
+        tr(app.language, "Processor", "Процессор"),
         layout.width,
         layout.section_style,
     );
+
+    // Name
     push_line(
         lines,
-        tr(app.language, "Model", "Модель"),
+        tr(app.language, "Name", "Имя"),
         cpu_brand.to_string(),
         layout.width,
         layout.label_width,
         layout.label_style,
         layout.value_style,
     );
+
+    // Code Name
+    let codename_str = codename.as_ref().map(|c| c.codename).unwrap_or(na);
+    push_line(
+        lines,
+        tr(app.language, "Code Name", "Код. имя"),
+        codename_str.to_string(),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    // Package
+    let package_str = codename.as_ref().map(|c| c.package).unwrap_or(na);
+    push_line(
+        lines,
+        tr(app.language, "Package", "Сокет"),
+        package_str.to_string(),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    // Technology
+    let tech_str = codename.as_ref().map(|c| c.technology).unwrap_or(na);
+    push_line(
+        lines,
+        tr(app.language, "Technology", "Техпроц."),
+        tech_str.to_string(),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    // Family/Model/Stepping
+    push_line(
+        lines,
+        tr(app.language, "Specification", "Специфик."),
+        details.family_model_stepping(),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    // Instructions
+    let instructions = details.key_instructions();
+    if !instructions.is_empty() {
+        push_line(
+            lines,
+            tr(app.language, "Instructions", "Инструкции"),
+            instructions.join(", "),
+            layout.width,
+            layout.label_width,
+            layout.label_style,
+            layout.value_style,
+        );
+    }
+
+    // Section: Clocks
+    push_header(
+        lines,
+        tr(app.language, "Clocks", "Частоты"),
+        layout.width,
+        layout.section_style,
+    );
+
+    // Core Speed
+    push_line(
+        lines,
+        tr(app.language, "Core Speed", "Скор. ядра"),
+        cpu_freq.to_string(),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    // Bus Speed (100 MHz for modern CPUs)
+    push_line(
+        lines,
+        tr(app.language, "Bus Speed", "Шина"),
+        "100.00 MHz".to_string(),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    // Section: Cores
+    push_header(
+        lines,
+        tr(app.language, "Cores", "Ядра"),
+        layout.width,
+        layout.section_style,
+    );
+
     push_line(
         lines,
         tr(app.language, "Cores", "Ядра"),
@@ -54,15 +163,7 @@ pub(super) fn push_cpu(
         layout.label_style,
         layout.value_style,
     );
-    push_line(
-        lines,
-        tr(app.language, "Freq", "Част."),
-        cpu_freq.to_string(),
-        layout.width,
-        layout.label_width,
-        layout.label_style,
-        layout.value_style,
-    );
+
     push_line(
         lines,
         tr(app.language, "Usage", "Загр."),
@@ -72,10 +173,49 @@ pub(super) fn push_cpu(
         layout.label_style,
         layout.value_style,
     );
+
     push_line(
         lines,
         tr(app.language, "Load", "Нагрузка"),
         format!("{:.2} {:.2} {:.2}", load.one, load.five, load.fifteen),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    // Section: Cache
+    push_header(
+        lines,
+        tr(app.language, "Cache", "Кэш"),
+        layout.width,
+        layout.section_style,
+    );
+
+    push_line(
+        lines,
+        "L1 Data",
+        caches.format_l1(),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    push_line(
+        lines,
+        "L2",
+        caches.format_l2(),
+        layout.width,
+        layout.label_width,
+        layout.label_style,
+        layout.value_style,
+    );
+
+    push_line(
+        lines,
+        "L3",
+        caches.format_l3(),
         layout.width,
         layout.label_width,
         layout.label_style,
