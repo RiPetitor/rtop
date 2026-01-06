@@ -4,4 +4,4 @@
 *~
 .idea/
 .vscode/
-*.md
+/docs
