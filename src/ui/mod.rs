@@ -118,7 +118,17 @@ fn render_overview(frame: &mut Frame, app: &mut App, size: Rect) {
 
     header::render(frame, chunks[0], app);
     stats::render_with_focus(frame, chunks[1], app, false);
-    processes::render_with_focus(frame, chunks[2], app, app.processes_focused);
+    let process_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+        .split(chunks[2]);
+    processes::render_search_panel(frame, process_chunks[0], app);
+    processes::render_with_focus(
+        frame,
+        process_chunks[1],
+        app,
+        app.processes_focused && !app.process_filter_active,
+    );
     footer::render(frame, chunks[3], app);
     confirm::render(frame, app);
     help::render(frame, app);
