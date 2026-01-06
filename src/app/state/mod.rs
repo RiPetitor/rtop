@@ -5,6 +5,7 @@ pub(crate) mod logo;
 mod rows;
 mod selection;
 mod tree;
+mod types;
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -22,207 +23,10 @@ use crate::data::gpu::{GpuInfo, GpuPreference, GpuProcessUsage, GpuSnapshot, sta
 use crate::data::{ContainerKey, ContainerRow, NetSample, ProcessRow, SortDir, SortKey};
 use logo::{IconMode, LogoCache, LogoMode, LogoQuality};
 
-pub struct ConfirmKill {
-    pub pid: u32,
-    pub name: String,
-    pub cpu: f32,
-    pub mem_bytes: u64,
-    pub status: String,
-    pub start_time: u64,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Language {
-    English,
-    Russian,
-}
-
-impl Language {
-    pub fn label(self) -> &'static str {
-        match self {
-            Language::English => "English",
-            Language::Russian => "Russian",
-        }
-    }
-
-    pub fn parse(value: &str) -> Option<Self> {
-        match value.to_ascii_lowercase().as_str() {
-            "en" | "eng" | "english" => Some(Language::English),
-            "ru" | "rus" | "russian" => Some(Language::Russian),
-            _ => None,
-        }
-    }
-
-    pub fn code(self) -> &'static str {
-        match self {
-            Language::English => "en",
-            Language::Russian => "ru",
-        }
-    }
-
-    pub fn toggle(self) -> Self {
-        match self {
-            Language::English => Language::Russian,
-            Language::Russian => Language::English,
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct HeaderRegion {
-    pub key: SortKey,
-    pub rect: Rect,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GpuProcessSortKey {
-    Pid,
-    Kind,
-    Sm,
-    Mem,
-    Enc,
-    Dec,
-    Vram,
-    Name,
-}
-
-impl GpuProcessSortKey {
-    pub fn default_dir(self) -> SortDir {
-        match self {
-            GpuProcessSortKey::Pid | GpuProcessSortKey::Kind | GpuProcessSortKey::Name => {
-                SortDir::Asc
-            }
-            GpuProcessSortKey::Sm
-            | GpuProcessSortKey::Mem
-            | GpuProcessSortKey::Enc
-            | GpuProcessSortKey::Dec
-            | GpuProcessSortKey::Vram => SortDir::Desc,
-        }
-    }
-
-    pub fn next(self) -> Self {
-        match self {
-            GpuProcessSortKey::Pid => GpuProcessSortKey::Kind,
-            GpuProcessSortKey::Kind => GpuProcessSortKey::Sm,
-            GpuProcessSortKey::Sm => GpuProcessSortKey::Mem,
-            GpuProcessSortKey::Mem => GpuProcessSortKey::Enc,
-            GpuProcessSortKey::Enc => GpuProcessSortKey::Dec,
-            GpuProcessSortKey::Dec => GpuProcessSortKey::Vram,
-            GpuProcessSortKey::Vram => GpuProcessSortKey::Name,
-            GpuProcessSortKey::Name => GpuProcessSortKey::Pid,
-        }
-    }
-
-    pub fn prev(self) -> Self {
-        match self {
-            GpuProcessSortKey::Pid => GpuProcessSortKey::Name,
-            GpuProcessSortKey::Kind => GpuProcessSortKey::Pid,
-            GpuProcessSortKey::Sm => GpuProcessSortKey::Kind,
-            GpuProcessSortKey::Mem => GpuProcessSortKey::Sm,
-            GpuProcessSortKey::Enc => GpuProcessSortKey::Mem,
-            GpuProcessSortKey::Dec => GpuProcessSortKey::Enc,
-            GpuProcessSortKey::Vram => GpuProcessSortKey::Dec,
-            GpuProcessSortKey::Name => GpuProcessSortKey::Vram,
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct GpuProcessHeaderRegion {
-    pub key: GpuProcessSortKey,
-    pub rect: Rect,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum SystemTab {
-    #[default]
-    Overview,
-    Cpu,
-    Memory,
-    Disks,
-    Network,
-    Temps,
-}
-
-impl SystemTab {
-    pub fn next(self) -> Self {
-        match self {
-            SystemTab::Overview => SystemTab::Cpu,
-            SystemTab::Cpu => SystemTab::Memory,
-            SystemTab::Memory => SystemTab::Disks,
-            SystemTab::Disks => SystemTab::Network,
-            SystemTab::Network => SystemTab::Temps,
-            SystemTab::Temps => SystemTab::Overview,
-        }
-    }
-
-    pub fn prev(self) -> Self {
-        match self {
-            SystemTab::Overview => SystemTab::Temps,
-            SystemTab::Cpu => SystemTab::Overview,
-            SystemTab::Memory => SystemTab::Cpu,
-            SystemTab::Disks => SystemTab::Memory,
-            SystemTab::Network => SystemTab::Disks,
-            SystemTab::Temps => SystemTab::Network,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum SetupField {
-    #[default]
-    Language,
-    IconMode,
-    LogoMode,
-    LogoQuality,
-}
-
-impl SetupField {
-    pub fn next(self) -> Self {
-        match self {
-            SetupField::Language => SetupField::IconMode,
-            SetupField::IconMode => SetupField::LogoMode,
-            SetupField::LogoMode => SetupField::LogoQuality,
-            SetupField::LogoQuality => SetupField::Language,
-        }
-    }
-
-    pub fn prev(self) -> Self {
-        match self {
-            SetupField::Language => SetupField::LogoQuality,
-            SetupField::IconMode => SetupField::Language,
-            SetupField::LogoMode => SetupField::IconMode,
-            SetupField::LogoQuality => SetupField::LogoMode,
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct SystemTabRegion {
-    pub tab: SystemTab,
-    pub rect: Rect,
-}
-
-#[derive(Clone, Debug)]
-pub struct SystemOverviewSnapshot {
-    pub user_host: String,
-    pub distro_line: String,
-    pub os_name: String,
-    pub kernel_line: String,
-    pub uptime_line: String,
-    pub board_line: String,
-    pub cpu_line: String,
-    pub gpu_line: String,
-    pub mem_line: String,
-    pub disk_lines: Vec<String>,
-    pub display_line: String,
-    pub mouse_line: String,
-    pub de_line: String,
-    pub wm_line: String,
-    pub shell_line: String,
-    pub terminal_line: String,
-    pub package_line: String,
-}
+pub use types::{
+    ConfirmKill, GpuProcessHeaderRegion, GpuProcessSortKey, HeaderRegion, Language, SetupField,
+    SystemOverviewSnapshot, SystemTab, SystemTabRegion,
+};
 
 #[derive(Default, Clone, Copy)]
 struct ProcessGpuUsage {
@@ -262,6 +66,7 @@ impl ProcessGpuUsage {
 }
 
 pub struct App {
+    // Core system data
     pub system: System,
     pub disks: Disks,
     pub networks: Networks,
@@ -269,34 +74,27 @@ pub struct App {
     pub network_refresh_secs: Option<f64>,
     users: Users,
     current_user_id: Option<Uid>,
+
+    // Process data
     pub sort_key: SortKey,
     pub sort_dir: SortDir,
     pub tree_view: bool,
     pub rows: Vec<ProcessRow>,
-    pub table_state: TableState,
     pub selected_pid: Option<u32>,
-    pub scroll: usize,
     pub tree_labels: HashMap<u32, String>,
-    pub process_body: Option<Rect>,
-    pub process_header_regions: Vec<HeaderRegion>,
-    pub gpu_process_header_regions: Vec<GpuProcessHeaderRegion>,
-    pub gpu_process_body: Option<Rect>,
-    pub system_tab: SystemTab,
-    pub system_tab_regions: Vec<SystemTabRegion>,
-    pub system_update_region: Option<Rect>,
-    pub system_overview_snapshot: Option<SystemOverviewSnapshot>,
-    pub icon_mode: IconMode,
-    pub logo_mode: LogoMode,
-    pub logo_quality: LogoQuality,
-    pub logo_cache: Option<LogoCache>,
+
+    // GPU data
+    pub vram_enabled: bool,
+    pub gpu_pref: GpuPreference,
+    pub gpu_list: Vec<GpuInfo>,
+    pub gpu_selected: Option<String>,
+    pub gpu_processes: Vec<GpuProcessUsage>,
     pub gpu_process_order: Vec<u32>,
-    pub gpu_process_scroll: usize,
-    pub gpu_process_sort_key: GpuProcessSortKey,
-    pub gpu_process_sort_dir: SortDir,
+    gpu_rx: Option<mpsc::Receiver<GpuSnapshot>>,
+
+    // Container data
     pub container_rows: Vec<ContainerRow>,
-    pub container_table_state: TableState,
     pub container_selected: Option<ContainerKey>,
-    pub container_scroll: usize,
     pub container_pid_map: HashMap<u32, ContainerKey>,
     pub container_filter: Option<ContainerKey>,
     container_net_prev: HashMap<u64, NetSampleEntry>,
@@ -304,24 +102,49 @@ pub struct App {
     container_netns_cache: HashMap<ContainerKey, u64>,
     container_net_last_sample: Option<Instant>,
     network_last_refresh: Option<Instant>,
-    pub confirm: Option<ConfirmKill>,
-    pub highlight_mode: HighlightMode,
-    pub vram_enabled: bool,
-    pub gpu_pref: GpuPreference,
-    pub gpu_list: Vec<GpuInfo>,
-    pub gpu_selected: Option<String>,
-    pub gpu_processes: Vec<GpuProcessUsage>,
-    gpu_rx: Option<mpsc::Receiver<GpuSnapshot>>,
-    pub status: Option<StatusMessage>,
+
+    // System info data
+    pub system_overview_snapshot: Option<SystemOverviewSnapshot>,
+
+    // Display settings
+    pub icon_mode: IconMode,
+    pub logo_mode: LogoMode,
+    pub logo_quality: LogoQuality,
+    pub logo_cache: Option<LogoCache>,
+    pub language: Language,
+
+    // View state
     pub view_mode: ViewMode,
     pub gpu_focus_panel: GpuFocusPanel,
     pub gpu_panel_expanded: bool,
     pub processes_focused: bool,
     pub processes_expanded: bool,
+    pub highlight_mode: HighlightMode,
+
+    // Dialogs
+    pub confirm: Option<ConfirmKill>,
+
+    // Status
+    pub status: Option<StatusMessage>,
+
+    // UI state (layout, scroll, table states)
+    pub table_state: TableState,
+    pub scroll: usize,
+    pub process_body: Option<Rect>,
+    pub process_header_regions: Vec<HeaderRegion>,
+    pub gpu_process_header_regions: Vec<GpuProcessHeaderRegion>,
+    pub gpu_process_body: Option<Rect>,
+    pub gpu_process_scroll: usize,
+    pub gpu_process_sort_key: GpuProcessSortKey,
+    pub gpu_process_sort_dir: SortDir,
+    pub container_table_state: TableState,
+    pub container_scroll: usize,
+    pub system_tab: SystemTab,
+    pub system_tab_regions: Vec<SystemTabRegion>,
+    pub system_update_region: Option<Rect>,
     pub show_setup: bool,
     pub show_help: bool,
     pub setup_field: SetupField,
-    pub language: Language,
 }
 
 impl App {
@@ -342,6 +165,7 @@ impl App {
             None
         };
         let mut app = Self {
+            // Core system data
             system,
             disks,
             networks,
@@ -349,34 +173,27 @@ impl App {
             network_refresh_secs: None,
             users,
             current_user_id,
+
+            // Process data
             sort_key: config.sort_key,
             sort_dir: config.sort_dir,
             tree_view: false,
             rows: Vec::new(),
-            table_state: TableState::default(),
             selected_pid: None,
-            scroll: 0,
             tree_labels: HashMap::new(),
-            process_body: None,
-            process_header_regions: Vec::new(),
-            gpu_process_header_regions: Vec::new(),
-            gpu_process_body: None,
-            system_tab: SystemTab::default(),
-            system_tab_regions: Vec::new(),
-            system_update_region: None,
-            system_overview_snapshot: None,
-            icon_mode: config.icon_mode,
-            logo_mode: config.logo_mode,
-            logo_quality: config.logo_quality,
-            logo_cache: None,
+
+            // GPU data
+            vram_enabled: config.vram_enabled,
+            gpu_pref: config.gpu_pref,
+            gpu_list: Vec::new(),
+            gpu_selected: None,
+            gpu_processes: Vec::new(),
             gpu_process_order: Vec::new(),
-            gpu_process_scroll: 0,
-            gpu_process_sort_key: GpuProcessSortKey::Sm,
-            gpu_process_sort_dir: GpuProcessSortKey::Sm.default_dir(),
+            gpu_rx,
+
+            // Container data
             container_rows: Vec::new(),
-            container_table_state: TableState::default(),
             container_selected: None,
-            container_scroll: 0,
             container_pid_map: HashMap::new(),
             container_filter: None,
             container_net_prev: HashMap::new(),
@@ -384,24 +201,49 @@ impl App {
             container_netns_cache: HashMap::new(),
             container_net_last_sample: None,
             network_last_refresh: Some(Instant::now()),
-            confirm: None,
-            highlight_mode: HighlightMode::default(),
-            vram_enabled: config.vram_enabled,
-            gpu_pref: config.gpu_pref,
-            gpu_list: Vec::new(),
-            gpu_selected: None,
-            gpu_processes: Vec::new(),
-            gpu_rx,
-            status: None,
+
+            // System info data
+            system_overview_snapshot: None,
+
+            // Display settings
+            icon_mode: config.icon_mode,
+            logo_mode: config.logo_mode,
+            logo_quality: config.logo_quality,
+            logo_cache: None,
+            language: config.language,
+
+            // View state
             view_mode: ViewMode::default(),
             gpu_focus_panel: GpuFocusPanel::default(),
             gpu_panel_expanded: false,
             processes_focused: false,
             processes_expanded: false,
+            highlight_mode: HighlightMode::default(),
+
+            // Dialogs
+            confirm: None,
+
+            // Status
+            status: None,
+
+            // UI state
+            table_state: TableState::default(),
+            scroll: 0,
+            process_body: None,
+            process_header_regions: Vec::new(),
+            gpu_process_header_regions: Vec::new(),
+            gpu_process_body: None,
+            gpu_process_scroll: 0,
+            gpu_process_sort_key: GpuProcessSortKey::Sm,
+            gpu_process_sort_dir: GpuProcessSortKey::Sm.default_dir(),
+            container_table_state: TableState::default(),
+            container_scroll: 0,
+            system_tab: SystemTab::default(),
+            system_tab_regions: Vec::new(),
+            system_update_region: None,
             show_setup: false,
             show_help: false,
             setup_field: SetupField::default(),
-            language: config.language,
         };
         app.update_rows();
         app.poll_gpu_updates();

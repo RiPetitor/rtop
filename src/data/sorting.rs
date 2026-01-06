@@ -2,8 +2,9 @@ use std::cmp::Ordering;
 
 use super::ProcessRow;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub enum SortDir {
+    #[default]
     Asc,
     Desc,
 }
