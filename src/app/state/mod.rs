@@ -27,8 +27,8 @@ use crate::data::{ContainerKey, ContainerRow, NetSample, ProcessRow, SortDir, So
 use logo::{IconMode, LogoCache, LogoMode, LogoQuality};
 
 pub use types::{
-    ConfirmKill, GpuProcessHeaderRegion, GpuProcessSortKey, HeaderRegion, Language, SetupField,
-    SystemOverviewSnapshot, SystemTab, SystemTabRegion,
+    ConfirmKill, GpuProcessHeaderRegion, GpuProcessSortKey, HeaderRegion, Language,
+    ProcessFilterType, SetupField, SystemOverviewSnapshot, SystemTab, SystemTabRegion,
 };
 
 #[derive(Default, Clone, Copy)]
@@ -84,6 +84,7 @@ pub struct App {
     pub tree_view: bool,
     pub rows: Vec<ProcessRow>,
     pub process_filter: String,
+    pub process_filter_type: ProcessFilterType,
     pub selected_pid: Option<u32>,
     pub tree_labels: HashMap<u32, String>,
     gui_process_cache: HashMap<u32, bool>,
@@ -186,6 +187,7 @@ impl App {
             tree_view: false,
             rows: Vec::new(),
             process_filter: String::new(),
+            process_filter_type: ProcessFilterType::default(),
             selected_pid: None,
             tree_labels: HashMap::new(),
             gui_process_cache: HashMap::new(),

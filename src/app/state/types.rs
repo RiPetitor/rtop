@@ -2,6 +2,49 @@ use ratatui::prelude::Rect;
 
 use crate::data::{SortDir, SortKey};
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ProcessFilterType {
+    #[default]
+    Name,
+    Pid,
+    User,
+}
+
+impl ProcessFilterType {
+    pub fn label(self, lang: Language) -> &'static str {
+        match (self, lang) {
+            (ProcessFilterType::Name, Language::English) => "Name",
+            (ProcessFilterType::Name, Language::Russian) => "Имя",
+            (ProcessFilterType::Pid, _) => "PID",
+            (ProcessFilterType::User, Language::English) => "User",
+            (ProcessFilterType::User, Language::Russian) => "Пользователь",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            ProcessFilterType::Name => ProcessFilterType::Pid,
+            ProcessFilterType::Pid => ProcessFilterType::User,
+            ProcessFilterType::User => ProcessFilterType::Name,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            ProcessFilterType::Name => ProcessFilterType::User,
+            ProcessFilterType::Pid => ProcessFilterType::Name,
+            ProcessFilterType::User => ProcessFilterType::Pid,
+        }
+    }
+
+    pub fn validate_char(self, ch: char) -> bool {
+        match self {
+            ProcessFilterType::Pid => ch.is_ascii_digit(),
+            ProcessFilterType::Name | ProcessFilterType::User => true,
+        }
+    }
+}
+
 pub struct ConfirmKill {
     pub pid: u32,
     pub name: String,

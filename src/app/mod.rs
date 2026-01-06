@@ -12,8 +12,8 @@ pub use state::logo::{
     RenderedLogo, RgbColor, RgbaColor, SvgLogo,
 };
 pub use state::{
-    GpuProcessHeaderRegion, GpuProcessSortKey, HeaderRegion, Language, SetupField,
-    SystemOverviewSnapshot, SystemTab, SystemTabRegion,
+    GpuProcessHeaderRegion, GpuProcessSortKey, HeaderRegion, Language, ProcessFilterType,
+    SetupField, SystemOverviewSnapshot, SystemTab, SystemTabRegion,
 };
 pub use status::{StatusLevel, StatusMessage};
 pub use view_mode::{GpuFocusPanel, ViewMode};

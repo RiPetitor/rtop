@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use sysinfo::Uid;
 
-use super::{App, ProcessGpuUsage};
+use super::{App, ProcessFilterType, ProcessGpuUsage};
 use crate::data::gpu::GpuProcessUsage;
 use crate::data::{ProcessRow, sort_process_rows};
 
@@ -118,8 +118,28 @@ impl App {
         let filter = self.process_filter.trim();
         if !filter.is_empty() {
             let needle = filter.to_lowercase();
-            self.rows
-                .retain(|row| row.name.to_lowercase().contains(&needle));
+            match self.process_filter_type {
+                ProcessFilterType::Name => {
+                    self.rows
+                        .retain(|row| row.name.to_lowercase().contains(&needle));
+                }
+                ProcessFilterType::Pid => {
+                    if let Ok(pid) = filter.parse::<u32>() {
+                        self.rows.retain(|row| row.pid == pid);
+                    } else {
+                        // Partial PID match - filter by prefix
+                        self.rows
+                            .retain(|row| row.pid.to_string().starts_with(filter));
+                    }
+                }
+                ProcessFilterType::User => {
+                    self.rows.retain(|row| {
+                        row.user
+                            .as_ref()
+                            .is_some_and(|user| user.to_lowercase().contains(&needle))
+                    });
+                }
+            }
         }
 
         // Clean up GUI cache for dead processes
