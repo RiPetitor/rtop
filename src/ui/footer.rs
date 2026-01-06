@@ -20,9 +20,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     } else {
         let enter_label = if app.view_mode == ViewMode::Container {
             tr(app.language, "drill", "внутрь")
-        } else if app.view_mode == ViewMode::Overview && !app.processes_expanded {
-            tr(app.language, "expand", "развернуть")
-        } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
+        } else if (app.view_mode == ViewMode::Overview && !app.processes_expanded)
+            || (app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded)
+        {
             tr(app.language, "expand", "развернуть")
         } else {
             tr(app.language, "terminate", "завершить")

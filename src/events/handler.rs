@@ -164,9 +164,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
                 if app.processes_expanded {
                     // Expanded mode - kill process
                     app.open_confirm();
-                } else {
-                    // Normal mode - expand Processes panel
+                } else if app.processes_focused {
+                    // Processes box focused - expand to fullscreen
                     app.expand_processes();
+                } else {
+                    // Box not focused - kill process directly
+                    app.open_confirm();
                 }
             } else if app.view_mode == ViewMode::GpuFocus {
                 use crate::app::GpuFocusPanel;
@@ -249,7 +252,14 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
         KeyCode::Tab => {
             // Tab switches panels within current view
             if app.view_mode == ViewMode::Overview && !app.processes_expanded {
-                app.toggle_processes_focus();
+                if app.processes_focused {
+                    // Switch from processes table to search input
+                    app.process_filter_active = true;
+                    app.processes_focused = false;
+                } else {
+                    // Switch from stats to processes (focused on table)
+                    app.processes_focused = true;
+                }
             } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
                 app.toggle_gpu_focus_panel();
             } else if app.view_mode == ViewMode::SystemInfo {
@@ -260,7 +270,13 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> EventResult {
         }
         KeyCode::BackTab => {
             if app.view_mode == ViewMode::Overview && !app.processes_expanded {
-                app.toggle_processes_focus();
+                if app.processes_focused {
+                    // Switch from processes table to stats
+                    app.processes_focused = false;
+                } else {
+                    // Switch from stats to search input
+                    app.process_filter_active = true;
+                }
             } else if app.view_mode == ViewMode::GpuFocus && !app.gpu_panel_expanded {
                 app.toggle_gpu_focus_panel();
             } else if app.view_mode == ViewMode::SystemInfo {
@@ -300,6 +316,22 @@ fn handle_process_filter_input(app: &mut App, key: KeyEvent) -> EventResult {
         KeyCode::Enter => {
             app.process_filter_active = false;
         }
+        KeyCode::Tab => {
+            // Switch filter type forward and clear filter text
+            app.process_filter_type = app.process_filter_type.next();
+            if !app.process_filter.is_empty() {
+                app.process_filter.clear();
+                app.update_rows();
+            }
+        }
+        KeyCode::BackTab => {
+            // Switch filter type backward and clear filter text
+            app.process_filter_type = app.process_filter_type.prev();
+            if !app.process_filter.is_empty() {
+                app.process_filter.clear();
+                app.update_rows();
+            }
+        }
         KeyCode::Backspace => {
             if !app.process_filter.is_empty() {
                 app.process_filter.pop();
@@ -309,6 +341,7 @@ fn handle_process_filter_input(app: &mut App, key: KeyEvent) -> EventResult {
         KeyCode::Char(ch) => {
             if !key.modifiers.contains(KeyModifiers::CONTROL)
                 && !key.modifiers.contains(KeyModifiers::ALT)
+                && app.process_filter_type.validate_char(ch)
             {
                 app.process_filter.push(ch);
                 app.update_rows();
@@ -468,12 +501,11 @@ fn handle_scroll(app: &mut App, column: u16, row: u16, delta: i32) {
         return;
     }
 
-    if matches!(app.view_mode, ViewMode::Overview | ViewMode::Processes) {
-        if let Some(body) = app.process_body
-            && rect_contains(body, column, row)
-        {
-            app.move_selection(delta);
-        }
+    if matches!(app.view_mode, ViewMode::Overview | ViewMode::Processes)
+        && let Some(body) = app.process_body
+        && rect_contains(body, column, row)
+    {
+        app.move_selection(delta);
     }
 }
 
