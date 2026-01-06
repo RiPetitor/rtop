@@ -28,11 +28,11 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     app.system_tab_regions.clear();
     app.system_update_region = None;
     let size = frame.area();
-    if size.width < 60 || size.height < 22 {
+    if size.width < 120 || size.height < 39 {
         let msg = Paragraph::new(tr(
             app.language,
-            "Terminal too small. Resize to at least 60x22.",
-            "Терминал слишком мал. Увеличьте до 60x22 минимум.",
+            "Terminal too small. Resize to at least 120x39.",
+            "Терминал слишком мал. Увеличьте до 120x39 минимум.",
         ))
         .block(panel_block("rtop"))
         .alignment(Alignment::Center);
