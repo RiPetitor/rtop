@@ -39,6 +39,14 @@ impl App {
         let mut rows_map = HashMap::with_capacity(self.system.processes().len());
         let mut parents = HashMap::with_capacity(self.system.processes().len());
 
+        // Collect current PIDs for cache cleanup
+        let current_pids: std::collections::HashSet<u32> = self
+            .system
+            .processes()
+            .keys()
+            .map(|pid| pid.as_u32())
+            .collect();
+
         for (pid, process) in self.system.processes() {
             let pid = pid.as_u32();
             let user_id = process.user_id();
@@ -50,7 +58,11 @@ impl App {
                 _ => false,
             };
             let is_non_root = is_non_root_user(user_id);
-            let is_gui = is_gui_process(process.environ());
+            // Use cached GUI detection result or compute and cache it
+            let is_gui = *self
+                .gui_process_cache
+                .entry(pid)
+                .or_insert_with(|| is_gui_process(process.environ()));
 
             parents.insert(pid, process.parent().map(|parent| parent.as_u32()));
 
@@ -102,6 +114,11 @@ impl App {
             self.rows = rows;
             self.tree_labels.clear();
         }
+
+        // Clean up GUI cache for dead processes
+        self.gui_process_cache
+            .retain(|pid, _| current_pids.contains(pid));
+
         self.sync_selection();
     }
 }

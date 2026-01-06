@@ -13,7 +13,10 @@ use std::time::Instant;
 
 use ratatui::prelude::Rect;
 use ratatui::widgets::TableState;
-use sysinfo::{Components, Disks, Networks, Pid, System, Uid, Users};
+use sysinfo::{
+    Components, Disks, Networks, Pid, ProcessRefreshKind, RefreshKind, System, Uid, UpdateKind,
+    Users,
+};
 
 use super::config::Config;
 use super::highlight::HighlightMode;
@@ -82,6 +85,7 @@ pub struct App {
     pub rows: Vec<ProcessRow>,
     pub selected_pid: Option<u32>,
     pub tree_labels: HashMap<u32, String>,
+    gui_process_cache: HashMap<u32, bool>,
 
     // GPU data
     pub vram_enabled: bool,
@@ -181,6 +185,7 @@ impl App {
             rows: Vec::new(),
             selected_pid: None,
             tree_labels: HashMap::new(),
+            gui_process_cache: HashMap::new(),
 
             // GPU data
             vram_enabled: config.vram_enabled,
@@ -251,7 +256,14 @@ impl App {
     }
 
     pub fn refresh(&mut self) {
-        self.system.refresh_all();
+        // Use selective refresh instead of refresh_all for better performance
+        let process_refresh = ProcessRefreshKind::nothing()
+            .with_cpu()
+            .with_memory()
+            .with_user(UpdateKind::OnlyIfNotSet)
+            .with_environ(UpdateKind::OnlyIfNotSet);
+        let refresh_kind = RefreshKind::nothing().with_processes(process_refresh);
+        self.system.refresh_specifics(refresh_kind);
         self.users.refresh();
         let now = Instant::now();
         self.network_refresh_secs = self
